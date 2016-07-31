@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <reaver/error.h>
+#include <reaver/prelude/functor.h>
 
 #include "vapor/lexer/token.h"
 #include "vapor/parser/module.h"
@@ -69,6 +70,12 @@ namespace reaver
                 auto end() const
                 {
                     return _modules.end();
+                }
+
+                template<typename F>
+                friend auto fmap(const ast & ast, F && f)
+                {
+                    return fmap(ast._modules, std::forward<F>(f));
                 }
 
             private:

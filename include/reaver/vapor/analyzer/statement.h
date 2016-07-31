@@ -25,8 +25,6 @@
 #include <boost/variant.hpp>
 
 #include "vapor/parser/statement.h"
-#include "vapor/analyzer/declaration.h"
-#include "vapor/analyzer/import.h"
 #include "vapor/analyzer/expression.h"
 #include "vapor/analyzer/helpers.h"
 
@@ -36,31 +34,19 @@ namespace reaver
     {
         namespace analyzer { inline namespace _v1
         {
-            using statement = shptr_variant<declaration, import, expression>;
+            class declaration;
+            class import;
+            class function;
 
-            statement preanalyze_statement(const parser::statement & parse, const std::shared_ptr<scope> & lex_scope)
-            {
-                return visit(make_visitor(
-                    id<parser::declaration>(), [&](auto && decl) -> statement
-                    {
-                        return make_declaration(decl.identifier.string, preanalyze_expression(decl.rhs, lex_scope), lex_scope, decl);
-                    },
+            using statement = variant<
+                recursive_wrapper<declaration>,
+                recursive_wrapper<import>,
+                expression_list,
+                recursive_wrapper<function>
+            >;
 
-                    id<parser::return_expression>(), [](auto && ret_expr) -> statement
-                    {
-                        assert(0);
-                        return std::shared_ptr<import>();
-                    },
-
-                    id<parser::expression_list>(), [](auto && expr_list) -> statement
-                    {
-                        assert(0);
-                        return std::shared_ptr<expression>();
-                    },
-
-                    default_id(), [](auto &&) -> statement { assert(0); }
-                ), parse.statement_value);
-            }
+            statement preanalyze_statement(const parser::statement & parse, scope & lex_scope);
         }}
     }
 }
+

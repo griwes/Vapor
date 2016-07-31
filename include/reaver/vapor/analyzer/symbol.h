@@ -38,21 +38,25 @@ namespace reaver
             class symbol
             {
             public:
-                symbol(std::string name, std::shared_ptr<scope> lex_scope, std::shared_ptr<variable> referenced_variable, std::shared_ptr<declaration> decl)
-                    : _name{ std::move(name) }, _lexical_scope{ std::move(lex_scope) }, _variable{ referenced_variable }, _declaration{ std::move(decl) }
+                symbol(std::u32string name, scope & lex_scope, variable referenced_variable) : _name{ std::move(name) }, _lexical_scope{ lex_scope }, _variable{ referenced_variable }
                 {
                 }
-            private:
-                std::string _name;
-                std::shared_ptr<scope> _lexical_scope;
-                std::shared_ptr<variable> _variable;
-                std::shared_ptr<declaration> _declaration;
-            };
 
-            auto make_symbol(std::string name, std::shared_ptr<scope> lex_scope, std::shared_ptr<variable> referenced_variable, std::shared_ptr<declaration> decl)
-            {
-                return std::make_shared<symbol>(std::move(name), std::move(lex_scope), std::move(referenced_variable), std::move(decl));
-            }
+                auto & variable()
+                {
+                    return _variable;
+                }
+
+                auto & variable() const
+                {
+                    return _variable;
+                }
+
+            private:
+                std::u32string _name;
+                scope & _lexical_scope;
+                class variable _variable;
+            };
         }}
     }
 }

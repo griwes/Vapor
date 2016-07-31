@@ -38,8 +38,8 @@ namespace reaver
             struct block
             {
                 range_type range;
-                std::vector<boost::variant<boost::recursive_wrapper<block>, boost::recursive_wrapper<statement>>> block_value;
-                boost::optional<boost::recursive_wrapper<expression_list>> value_expression;
+                std::vector<variant<recursive_wrapper<block>, recursive_wrapper<statement>>> block_value;
+                optional<expression_list> value_expression;
             };
 
             block parse_block(context & ctx);

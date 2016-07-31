@@ -1,0 +1,9 @@
+module hello_world
+{
+    import lib.console;
+
+    auto entry = []()
+    {
+        lib.console.print("hello world!");
+    };
+}

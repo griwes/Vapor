@@ -32,6 +32,11 @@ namespace reaver
         {
             class import_expression
             {
+            public:
+                void analyze()
+                {
+                    assert(0);
+                }
             };
 
             class import

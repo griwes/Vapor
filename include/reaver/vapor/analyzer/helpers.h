@@ -26,6 +26,7 @@
 
 #include <reaver/error.h>
 #include <reaver/id.h>
+#include <reaver/tpl/vector.h>
 
 namespace reaver
 {
@@ -33,7 +34,7 @@ namespace reaver
     {
         namespace analyzer { inline namespace _v1
         {
-            error_engine & default_error_engine()
+            inline error_engine & default_error_engine()
             {
                 static error_engine engine;
                 return engine;
@@ -50,12 +51,6 @@ namespace reaver
             {
                 error(std::move(message), parse, default_error_engine());
             }
-
-            template<typename... Ts>
-            using shptr_variant = boost::variant<std::shared_ptr<Ts>...>;
-
-            template<typename T>
-            using shptr_id = id<std::shared_ptr<T>>;
         }}
     }
 }

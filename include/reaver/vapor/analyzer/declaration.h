@@ -24,6 +24,8 @@
 
 #include <memory>
 
+#include <reaver/optional.h>
+
 #include "vapor/parser/declaration.h"
 #include "vapor/analyzer/symbol.h"
 #include "vapor/analyzer/expression.h"
@@ -34,13 +36,17 @@ namespace reaver
     {
         namespace analyzer { inline namespace _v1
         {
-            class declaration
+            class declaration : public std::enable_shared_from_this<declaration>
             {
             public:
-                declaration(std::u32string name, expression init, const std::shared_ptr<scope> & lex_scope, const parser::declaration & parse)
-                    : _name{ std::move(name) }, _initializer_expression{ std::move(init) }, _parse{ parse }
+                declaration(scope & lex_scope, const parser::declaration & parse)
+                    : _name{ parse.identifier.string },
+                    _declared_symbol{ symbol(_name, lex_scope, variable()) },
+                    _initializer_expression{ preanalyze_expression(parse.rhs, lex_scope) },
+                    _type_specifier{ fmap(parse.type_expression, [&](auto v){ return preanalyze_expression(v, lex_scope); })  },
+                    _parse{ parse }
                 {
-                    assert(0);
+                    lex_scope.add_symbol(_name, _declared_symbol);
                 }
 
                 const auto & name() const
@@ -63,18 +69,22 @@ namespace reaver
                     return _initializer_expression;
                 }
 
+                void analyze()
+                {
+                    _declared_symbol.variable()._declaration = *this;
+
+                    fmap(_type_specifier, [](auto && v) { analyzer::analyze(v); return unit{}; });
+                    analyzer::analyze(_initializer_expression);
+                    _declared_symbol.variable()._type = _type_specifier ? value_of(*_type_specifier) : type_of(_initializer_expression);
+                }
+
             private:
                 std::u32string _name;
-                std::shared_ptr<symbol> _declared_symbol;
+                symbol _declared_symbol;
                 expression _initializer_expression;
-
+                optional<expression> _type_specifier;
                 const parser::declaration & _parse;
             };
-
-            std::shared_ptr<declaration> make_declaration(std::u32string name, expression init, const std::shared_ptr<scope> & lexical_scope, const parser::declaration & parse)
-            {
-                return std::make_shared<declaration>(std::move(name), std::move(init), std::move(lexical_scope), parse);
-            }
         }}
     }
 }

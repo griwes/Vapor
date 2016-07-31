@@ -24,14 +24,14 @@
 
 #include <memory>
 
+#include <reaver/prelude/functor.h>
+
 #include "vapor/parser/expression_list.h"
 #include "vapor/parser/expression.h"
-#include "vapor/parser/lambda_expression.h"
-#include "vapor/analyzer/scope.h"
 #include "vapor/analyzer/helpers.h"
-#include "vapor/analyzer/literal.h"
+#include "vapor/analyzer/variable.h"
 #include "vapor/analyzer/import.h"
-#include "vapor/analyzer/lambda.h"
+#include "vapor/analyzer/literal.h"
 
 namespace reaver
 {
@@ -39,97 +39,53 @@ namespace reaver
     {
         namespace analyzer { inline namespace _v1
         {
+            class import_expression;
+
+            class scope;
+
             class postfix_expression
             {
+            public:
+                void analyze()
+                {
+                    assert(0);
+                }
             };
 
             class unary_expression
             {
+            public:
+                void analyze()
+                {
+                    assert(0);
+                }
             };
 
             class binary_expression
             {
+            public:
+                void analyze()
+                {
+                    assert(0);
+                }
             };
 
-            struct expression_recursive_wrapper;
-
-            using expression = shptr_variant<
-                std::vector<expression_recursive_wrapper>, // expression-list
+            using expression = variant<
                 literal,
+                variable,
                 import_expression,
                 postfix_expression,
-                lambda,
                 unary_expression,
                 binary_expression
             >;
 
-            struct expression_recursive_wrapper
-            {
-                expression value;
-            };
+            using expression_list = std::vector<expression>;
 
-            expression preanalyze_expression(const parser::expression & expr, const std::shared_ptr<scope> & lex_scope)
-            {
-                return visit(make_visitor(
-                    id<parser::string_literal>(), [](auto && string) -> expression
-                    {
-                        assert(0);
-                        return std::shared_ptr<literal>();
-                    },
-
-                    id<parser::integer_literal>(), [](auto && integer) -> expression
-                    {
-                        assert(0);
-                        return std::shared_ptr<literal>();
-                    },
-
-                    id<parser::postfix_expression>(), [](auto && postfix) -> expression
-                    {
-                        assert(0);
-                        return std::shared_ptr<postfix_expression>();
-                    },
-
-                    id<parser::import_expression>(), [](auto && import) -> expression
-                    {
-                        assert(0);
-                        return std::shared_ptr<import_expression>();
-                    },
-
-                    id<parser::lambda_expression>(), [](auto && lambda_expr) -> expression
-                    {
-                        assert(0);
-                        return std::shared_ptr<lambda>();
-                    },
-
-                    id<parser::unary_expression>(), [](auto && unary_expr) -> expression
-                    {
-                        assert(0);
-                        return std::shared_ptr<unary_expression>();
-                    },
-
-                    id<parser::binary_expression>(), [](auto && binary_expr) -> expression
-                    {
-                        assert(0);
-                        return std::shared_ptr<binary_expression>();
-                    }
-                ), expr.expression_value);
-            }
-
-            expression preanalyze_expression(const parser::expression_list & expr, const std::shared_ptr<scope> & lex_scope)
-            {
-                if (expr.expressions.size() > 1)
-                {
-                    return preanalyze_expression(expr, lex_scope);
-                }
-
-                auto ret = std::make_shared<std::vector<expression_recursive_wrapper>>();
-                ret->reserve(expr.expressions.size());
-                std::transform(expr.expressions.begin(), expr.expressions.end(), std::back_inserter(*ret), [&](auto && expr)
-                {
-                    return expression_recursive_wrapper{ preanalyze_expression(expr, lex_scope) };
-                });
-                return ret;
-            }
+            expression preanalyze_expression(const parser::expression & expr, const scope & lex_scope);
+            expression_list preanalyze_expression_list(const parser::expression_list & expr, const scope & lex_scope);
+            void analyze(expression & expr);
+            variable & type_of(const expression &);
+            variable & value_of(const expression &);
         }}
     }
 }

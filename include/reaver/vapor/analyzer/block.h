@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2014-2015 Michał "Griwes" Dominiak
+ * Copyright © 2015 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -22,38 +22,41 @@
 
 #pragma once
 
-#include <string>
+#include <reaver/optional.h>
 
-#include <reaver/variant.h>
-
-#include "vapor/parser/helpers.h"
-#include "vapor/parser/expression_list.h"
-#include "vapor/parser/declaration.h"
-#include "vapor/parser/return_expression.h"
-#include "vapor/parser/unary_expression.h"
-#include "vapor/parser/binary_expression.h"
-#include "vapor/parser/function.h"
+#include "vapor/parser/block.h"
+#include "vapor/analyzer/helpers.h"
+#include "vapor/analyzer/scope.h"
+#include "vapor/analyzer/expression.h"
+#include "vapor/analyzer/statement.h"
+#include "vapor/analyzer/declaration.h"
 
 namespace reaver
 {
     namespace vapor
     {
-        namespace parser { inline namespace _v1
+        namespace analyzer { inline namespace _v1
         {
-            struct statement
+            class block
             {
-                range_type range;
-                variant<
-                    declaration,
-                    return_expression,
-                    expression_list,
-                    function
-                > statement_value = expression_list();
+            public:
+                block(const parser::block & parse, const scope & lex_scope);
+
+                block(const block &) = default;
+                block(block &&) = default;
+
+                void analyze()
+                {
+                    assert(0);
+                }
+
+            private:
+                const parser::block & _parse;
+                scope _block_scope;
+                std::vector<variant<block, statement>> _value;
+                std::vector<expression> _returned_expressions;
+                optional<expression> _value_expression;
             };
-
-            statement parse_statement(context & ctx);
-
-            void print(const statement & stmt, std::ostream & os, std::size_t indent = 0);
         }}
     }
 }

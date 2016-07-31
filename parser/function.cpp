@@ -20,6 +20,7 @@
  *
  **/
 
+#include "vapor/parser/statement.h"
 #include "vapor/parser/function.h"
 #include "vapor/parser/lambda_expression.h"
 #include "vapor/parser/block.h"
@@ -45,7 +46,7 @@ reaver::vapor::parser::_v1::function reaver::vapor::parser::_v1::parse_function(
 
     ret.body = parse_block(ctx);
 
-    ret.range = { start, ret.body.get().range.end() };
+    ret.range = { start, ret.body->range.end() };
 
     return ret;
 }
@@ -59,7 +60,7 @@ void reaver::vapor::parser::_v1::print(const reaver::vapor::parser::_v1::functio
     os << in << "`function` at " << f.range << '\n';
     os << in << "{\n";
     os << std::string(indent + 4, ' ') << f.name << '\n';
-    print(f.body.get(), os, indent + 4);
+    print(*f.body, os, indent + 4);
     os << in << "}\n";
 }
 

@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include <reaver/visit.h>
+#include <reaver/variant.h>
 
 #include "vapor/range.h"
 #include "vapor/parser/helpers.h"
@@ -38,7 +38,7 @@ namespace reaver
             struct import_expression
             {
                 range_type range;
-                boost::variant<id_expression, string_literal> module_name;
+                reaver::variant<id_expression, string_literal> module_name = id_expression();
             };
 
             import_expression parse_import_expression(context & ctx);

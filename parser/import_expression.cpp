@@ -35,7 +35,7 @@ reaver::vapor::parser::_v1::import_expression reaver::vapor::parser::_v1::parse_
     {
         ret.module_name = parse_id_expression(ctx);
     }
-    visit([&](const auto & elem) { ret.range = { start, elem.range.end() }; return unit{}; }, ret.module_name);
+    fmap(ret.module_name, [&](const auto & elem) { ret.range = { start, elem.range.end() }; return unit{}; });
 
     return ret;
 }
@@ -46,6 +46,6 @@ void reaver::vapor::parser::_v1::print(const reaver::vapor::parser::_v1::import_
 
     os << in << "`import-expression` at " << expr.range << '\n';
     os << in << "{\n";
-    visit([&](const auto & elem) { print(elem, os, indent + 4); return unit{}; }, expr.module_name);
+    fmap(expr.module_name, [&](const auto & elem) { print(elem, os, indent + 4); return unit{}; });
     os << in << "}\n";
 }

@@ -26,9 +26,8 @@
 #include <thread>
 #include <atomic>
 
-#include <boost/optional.hpp>
-
 #include <reaver/semaphore.h>
+#include <reaver/optional.h>
 
 #include "vapor/position.h"
 #include "vapor/lexer/token.h"
@@ -73,7 +72,7 @@ namespace reaver
                         pos.line = 1;
                         pos.file = std::move(filename);
 
-                        auto get = [&]() -> boost::optional<char32_t>
+                        auto get = [&]() -> optional<char32_t>
                         {
                             if (begin == end)
                             {
@@ -94,7 +93,7 @@ namespace reaver
                             return *begin++;
                         };
 
-                        auto peek = [&](std::size_t x = 0) -> boost::optional<char32_t>
+                        auto peek = [&](std::size_t x = 0) -> optional<char32_t>
                         {
                             for (std::size_t i = 0; i < x; ++i)
                             {

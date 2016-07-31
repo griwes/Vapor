@@ -25,9 +25,7 @@
 #include <string>
 #include <vector>
 
-#include <boost/variant.hpp>
-
-#include <reaver/visit.h>
+#include <reaver/variant.h>
 
 #include "vapor/range.h"
 #include "vapor/parser/helpers.h"
@@ -51,15 +49,15 @@ namespace reaver
             struct expression
             {
                 range_type range;
-                boost::variant<
+                variant<
                     literal<lexer::token_type::string>,
                     literal<lexer::token_type::integer>,
                     postfix_expression,
                     import_expression,
-                    boost::recursive_wrapper<lambda_expression>,
-                    boost::recursive_wrapper<unary_expression>,
-                    boost::recursive_wrapper<binary_expression>
-                > expression_value;
+                    recursive_wrapper<lambda_expression>,
+                    recursive_wrapper<unary_expression>,
+                    recursive_wrapper<binary_expression>
+                > expression_value = postfix_expression();
             };
 
             expression parse_expression(context & ctx, bool special_assignment = false);
@@ -68,3 +66,4 @@ namespace reaver
         }}
     }
 }
+

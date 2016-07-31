@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <reaver/prelude/functor.h>
+
 #include "vapor/parser/ast.h"
 #include "vapor/analyzer/module.h"
 #include "vapor/analyzer/helpers.h"
@@ -39,10 +41,10 @@ namespace reaver
                 {
                     try
                     {
-                        std::transform(original_ast.begin(), original_ast.end(), std::back_inserter(_modules), [](auto && m)
+                        _modules = fmap(original_ast, [](auto && m)
                         {
-                            auto ret = std::make_shared<module>(m);
-                            ret->analyze();
+                            auto ret = module(m);
+                            ret.analyze();
                             return ret;
                         });
                     }
@@ -52,7 +54,7 @@ namespace reaver
                         default_error_engine().push(e);
                     }
 
-                    if (default_error_engine().size())
+                    if (!default_error_engine())
                     {
                         default_error_engine().print(logger::default_logger());
                     }
@@ -79,7 +81,7 @@ namespace reaver
                 }
 
             private:
-                std::vector<std::shared_ptr<module>> _modules;
+                std::vector<module> _modules;
             };
         }}
     }

@@ -23,6 +23,8 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 namespace reaver
 {
@@ -30,12 +32,43 @@ namespace reaver
     {
         namespace analyzer { inline namespace _v1
         {
+            class symbol;
+
             class scope
             {
-            private:
+            public:
+                scope() = default;
+
+                scope(const scope &) = default;
+                scope(scope &&) = default;
+
+                void add_symbol(const std::u32string & name, symbol & symb)
+                {
+                    if (_symbols.find(name) != _symbols.end())
+                    {
+                        // TODO: throw an error
+                        assert(0);
+                    }
+
+                    _symbols.emplace(name, symb);
+                }
+
+                auto copy() const
+                {
+                    return scope{ *this, _key{} };
+                }
+
+            protected:
+                struct _key {};
+
+                scope(const scope & parent, _key) : _parent(parent)
+                {
+                }
+
+                optional<const scope &> _parent;
+                std::unordered_map<std::u32string, symbol &> _symbols;
             };
         }}
     }
 }
-
 

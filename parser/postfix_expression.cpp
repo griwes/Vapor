@@ -54,7 +54,7 @@ reaver::vapor::parser::_v1::postfix_expression reaver::vapor::parser::_v1::parse
     else
     {
         ret.base_expression = parse_id_expression(ctx);
-        auto & range = boost::get<id_expression>(ret.base_expression).range;
+        auto & range = get<id_expression>(ret.base_expression).range;
         start = range.start();
         end = range.end();
     }
@@ -75,7 +75,12 @@ reaver::vapor::parser::_v1::postfix_expression reaver::vapor::parser::_v1::parse
     {
         if (!peek(ctx, closing(*ret.bracket_type)))
         {
-            ret.argument = parse_expression_list(ctx);
+            ret.arguments.push_back(parse_expression(ctx));
+            while (peek(ctx, lexer::token_type::comma))
+            {
+                expect(ctx, lexer::token_type::comma);
+                ret.arguments.push_back(parse_expression(ctx));
+            }
         }
         end = expect(ctx, closing(*ret.bracket_type)).range.end();
     }
@@ -97,11 +102,15 @@ void reaver::vapor::parser::_v1::print(const reaver::vapor::parser::_v1::postfix
 
     os << in << "{\n";
 
-    visit([&](const auto & value) -> unit { print(value, os, indent + 4); return {}; }, expr.base_expression);
-    if (expr.argument)
+    fmap(expr.base_expression, [&](const auto & value) -> unit { print(value, os, indent + 4); return {}; });
+    if (expr.arguments.size())
     {
-        print(expr.argument->get(), os, indent + 4);
+        auto in = std::string(indent + 4, ' ');
+        os << in << "{\n";
+        fmap(expr.arguments, [&](auto && arg) -> unit { print(arg, os, indent + 8); return {}; });
+        os << in << "{\n";
     }
 
     os << in << "}\n";
 }
+

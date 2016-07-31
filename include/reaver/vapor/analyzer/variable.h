@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2014 Michał "Griwes" Dominiak
+ * Copyright © 2014-2015 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -24,15 +24,51 @@
 
 #include <memory>
 
+#include <reaver/optional.h>
+
+#include "vapor/range.h"
+#include "vapor/analyzer/value.h"
+
 namespace reaver
 {
     namespace vapor
     {
         namespace analyzer { inline namespace _v1
         {
+            class value;
+            class declaration;
+
             class variable
             {
+            public:
+                friend class declaration;
+
+                variable() : _type{ none }, _value{ none }
+                {
+                }
+
+                explicit variable(optional<const variable &> type) : _type{ type }, _value{ none }
+                {
+                }
+
+                variable(optional<const variable &> type, optional<value> value) : _type{ type }, _value{ value }
+                {
+                }
+
+                variable(const variable &) = default;
+                variable(variable &&) noexcept = default;
+
+                void analyze()
+                {
+                    assert(0);
+                }
+
+                vapor::range_type range;
+
             private:
+                optional<const variable &> _type;
+                optional<value> _value;
+                optional<declaration &> _declaration;
             };
         }}
     }

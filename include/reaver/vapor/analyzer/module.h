@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2014 Michał "Griwes" Dominiak
+ * Copyright © 2015 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -28,6 +28,8 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include <reaver/prelude/functor.h>
+
 #include "vapor/range.h"
 #include "vapor/parser/module.h"
 #include "vapor/parser/id_expression.h"
@@ -37,6 +39,7 @@
 #include "vapor/analyzer/symbol.h"
 #include "vapor/analyzer/helpers.h"
 #include "vapor/analyzer/statement.h"
+#include "vapor/analyzer/function.h"
 
 namespace reaver
 {
@@ -44,60 +47,48 @@ namespace reaver
     {
         namespace analyzer { inline namespace _v1
         {
-            class module : public scope, public std::enable_shared_from_this<module>
+            class module
             {
             public:
-                module(const parser::module & parse) : _parse{ parse }
+                module(const parser::module & parse) : _parse{ parse }, _statements{ fmap(parse.statements, [&](const auto & statement)
+                    { return preanalyze_statement(statement, _module_scope); }) }
                 {
                 }
 
                 void analyze()
                 {
-                    for (auto && statement : _parse.statements)
-                    {
-                        visit(make_visitor(
-                            shptr_id<declaration>(), [&](const std::shared_ptr<declaration> & decl)
-                            {
-                                auto & symb = _symbols[decl->name()];
-                                if (symb)
-                                {
-                                    error("redefinition of `" + utf8(decl->name()) + "`", decl->parse());
-                                }
-                                else
-                                {
-                                    symb = decl->declared_symbol();
-                                }
+                    fmap(_statements, [&](auto & statement) { return fmap(statement, make_overload_set(
+                        [&](declaration & decl)
+                        {
+                            decl.analyze();
+                            return unit{};
+                        },
 
-                                return unit{};
-                            },
+                        [&](expression &)
+                        {
+                            throw exception{ logger::crash } << "got invalid statement in module; fix the parser";
+                            return unit{};
+                        },
 
-                            shptr_id<import>(), [&](const std::shared_ptr<import> & im)
-                            {
-                                assert(0);
-                                return unit{};
-                            },
-
-                            shptr_id<expression>(), [&](auto &&...)
-                            {
-                                throw exception{ logger::crash } << "got invalid statement in module; fix the parser";
-                                return unit{};
-                            }
-                        ), preanalyze_statement(statement, shared_from_this()));
-                    }
+                        [](auto &&...)
+                        {
+                            assert(0);
+                            return unit{};
+                        }
+                    )); });
                 }
 
                 std::u32string name() const
                 {
-                    std::vector<std::u32string> tmp;
-                    tmp.reserve(_parse.name.id_expression_value.size());
-                    std::transform(_parse.name.id_expression_value.begin(), _parse.name.id_expression_value.end(), std::back_inserter(tmp), [](auto && elem) -> decltype(auto) { return elem.string; });
-                    return boost::join(tmp, ".");
+                    return boost::join(fmap(_parse.name.id_expression_value, [](auto && elem) -> decltype(auto) { return elem.string; }), ".");
                 }
 
             private:
+                scope _module_scope;
                 const parser::module & _parse;
-                std::unordered_map<std::u32string, std::shared_ptr<symbol>> _symbols;
+                std::vector<statement> _statements;
             };
         }}
     }
 }
+

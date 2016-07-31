@@ -52,7 +52,7 @@ reaver::vapor::parser::_v1::statement reaver::vapor::parser::_v1::parse_statemen
         }
 
         auto end = expect(ctx, lexer::token_type::semicolon).range.end();
-        visit([&](const auto & value) -> unit { ret.range = { value.range.start(), end }; return {}; }, ret.statement_value);
+        fmap(ret.statement_value, [&](const auto & value) -> unit { ret.range = { value.range.start(), end }; return {}; });
     }
 
     return ret;
@@ -64,6 +64,6 @@ void reaver::vapor::parser::_v1::print(const reaver::vapor::parser::_v1::stateme
 
     os << in << "`statement` at " << stmt.range << '\n';
     os << in << "{\n";
-    visit([&](const auto & value) -> unit { print(value, os, indent + 4); return {}; }, stmt.statement_value);
+    fmap(stmt.statement_value, [&](const auto & value) -> unit { print(value, os, indent + 4); return {}; });
     os << in << "}\n";
 }

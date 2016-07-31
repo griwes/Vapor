@@ -22,8 +22,9 @@
 
 #pragma once
 
-#include <boost/variant.hpp>
 #include <boost/optional.hpp>
+
+#include <reaver/variant.h>
 
 #include "vapor/range.h"
 #include "vapor/parser/helpers.h"
@@ -35,14 +36,15 @@ namespace reaver
     {
         namespace parser { inline namespace _v1
         {
+            struct expression;
             struct expression_list;
 
             struct postfix_expression
             {
                 range_type range;
-                boost::variant<id_expression, boost::recursive_wrapper<expression_list>> base_expression;
+                variant<id_expression, recursive_wrapper<expression_list>> base_expression = id_expression();
                 boost::optional<lexer::token_type> bracket_type;
-                boost::optional<boost::recursive_wrapper<expression_list>> argument;
+                std::vector<expression> arguments;
             };
 
             postfix_expression parse_postfix_expression(context & ctx);

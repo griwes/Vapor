@@ -30,6 +30,11 @@ namespace reaver
         {
             class literal
             {
+            public:
+                void analyze()
+                {
+                    assert(0);
+                }
             };
         }}
     }

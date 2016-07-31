@@ -61,9 +61,8 @@ reaver::vapor::parser::_v1::block reaver::vapor::parser::_v1::parse_single_state
     block ret;
 
     expect(ctx, lexer::token_type::block_value);
-    auto expr = parse_expression(ctx);
-    ret.range = expr.range;
-    ret.value_expression = expression_list{ ret.range, { std::move(expr) } };
+    ret.value_expression = parse_expression_list(ctx);
+    ret.range = ret.value_expression->range;
 
     return ret;
 }
@@ -80,14 +79,14 @@ void reaver::vapor::parser::_v1::print(const reaver::vapor::parser::_v1::block &
         for (auto && element : bl.block_value)
         {
             os << in << "{\n";
-            visit([&](const auto & value) -> unit { print(value, os, indent + 8); return {}; }, element);
+            fmap(element, [&](const auto & value) -> unit { print(value, os, indent + 8); return {}; });
             os << in << "}\n";
         }
 
         if (bl.value_expression)
         {
             os << in << "{\n";
-            print(bl.value_expression->get(), os, indent + 8);
+            print(*bl.value_expression, os, indent + 8);
             os << in << "}\n";
         }
     }

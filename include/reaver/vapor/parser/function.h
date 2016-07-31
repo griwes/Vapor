@@ -22,12 +22,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include <reaver/variant.h>
+#include <reaver/optional.h>
 
 #include "vapor/range.h"
 #include "vapor/parser/helpers.h"
 #include "vapor/parser/argument_list.h"
 #include "vapor/parser/expression.h"
+#include "vapor/parser/lambda_expression.h"
 
 namespace reaver
 {
@@ -41,9 +43,9 @@ namespace reaver
             {
                 range_type range;
                 lexer::token name;
-                boost::optional<argument_list> arguments;
-                boost::optional<expression> return_type;
-                boost::recursive_wrapper<block> body;
+                optional<argument_list> arguments;
+                optional<expression> return_type;
+                recursive_wrapper<block> body;
             };
 
             function parse_function(context & ctx);

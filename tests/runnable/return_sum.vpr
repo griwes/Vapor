@@ -1,0 +1,24 @@
+module return_sum
+{
+    import lib.console;
+
+    auto entry = [](string[] args) try
+    {
+        // mutable primitive, hence an atomic
+        mutable auto sum = 0;
+
+        // this could possibly executed in parallel...
+        args ->> [&](string.ref arg)
+        {
+            // perform a lexical cast, hopefully getting an integer
+            sum += to<int>(arg);
+        };
+
+        // retun sum
+        => sum
+    }
+    catch (lib.exceptions.bad_lexical_cast.ref e)
+    {
+        lib.console.print("One of the arguments was not a number!\n");
+    }
+}

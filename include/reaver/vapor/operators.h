@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2014-2015 Michał "Griwes" Dominiak
+ * Copyright © 2015 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -22,39 +22,14 @@
 
 #pragma once
 
-#include <string>
-
-#include <reaver/variant.h>
-
-#include "vapor/parser/helpers.h"
-#include "vapor/parser/expression_list.h"
-#include "vapor/parser/declaration.h"
-#include "vapor/parser/return_expression.h"
-#include "vapor/parser/unary_expression.h"
-#include "vapor/parser/binary_expression.h"
-#include "vapor/parser/function.h"
-
 namespace reaver
 {
-    namespace vapor
+    namespace vapor { inline namespace _v1
     {
-        namespace parser { inline namespace _v1
+        enum class operators
         {
-            struct statement
-            {
-                range_type range;
-                variant<
-                    declaration,
-                    return_expression,
-                    expression_list,
-                    function
-                > statement_value = expression_list();
-            };
-
-            statement parse_statement(context & ctx);
-
-            void print(const statement & stmt, std::ostream & os, std::size_t indent = 0);
-        }}
-    }
+            call
+        };
+    }}
 }
 

@@ -24,6 +24,8 @@
 
 #include <string>
 
+#include <reaver/optional.h>
+
 #include "vapor/range.h"
 #include "vapor/parser/expression_list.h"
 
@@ -37,7 +39,7 @@ namespace reaver
             {
                 range_type range;
                 lexer::token identifier;
-                boost::optional<expression> type_expression;
+                optional<expression> type_expression;
                 expression rhs;
             };
 

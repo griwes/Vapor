@@ -54,7 +54,7 @@ int main() try
     reaver::logger::dlog() << ast;
 
     reaver::logger::dlog() << "Analyzed AST:";
-//    reaver::vapor::analyzer::ast analyzed_ast{ ast };
+    reaver::vapor::analyzer::ast analyzed_ast{ ast };
 //    reaver::logger::dlog() << analyzed_ast;
 }
 
