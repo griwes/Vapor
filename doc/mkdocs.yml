@@ -1,3 +1,5 @@
 site_name: Vapor Language Documentation
 pages:
-    - Introduction: intro/index.md
+    - Home: index.md
+    - Specification:
+        - Introduction: spec/index.md

@@ -1,7 +1,5 @@
 # Vapor Programming Language Specification
 
-## Introduction
-
 This document is meant as a reference specificaion for Vapor multiparadigm programming language. It defines the lexical
 conventions, grammar of the language, and semantics of language constructs. Since the language is not yet in a working
 condition, and will keep evolving (at least syntax-wise) for a long time, keep in mind that this document will also
