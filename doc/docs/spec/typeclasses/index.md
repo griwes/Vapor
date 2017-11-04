@@ -49,26 +49,26 @@ instance-literal ::= `instance` identifier `(` expression `)` `{` function-defin
 This section uses names from the following piece of code to define semantics and requirements:
 
 ```
-let tc = with (T : type) typeclass {        // 1
-    function fndecl() -> int;               // 2
+let tc = with (T : type) typeclass {        // (A)
+    function fndecl() -> T;                 // (B)
 
-    function fndef(arg : int) -> int {      // 3
+    function fndef(arg : T) -> T {          // (C)
         return arg;
     }
 };
 
-default instance tc(int) {                  // 4
-    function fndecl() -> int {              // 5
+default instance tc(int) {                  // (D)
+    function fndecl() -> int {              // (E)
         return 0;
     }
 };
 
-let inst = instance tc(int) {               // 6
-    function fndecl() -> int {              // 7
+let nondefault = instance tc(int) {         // (F)
+    function fndecl() -> int {              // (G)
         return 1;
     }
 
-    function fndef(inst_arg : int) -> int { // 8
+    function fndef(inst_arg) {              // (H)
         return arg - 1;
     }
 };
@@ -78,21 +78,27 @@ let inst = instance tc(int) {               // 6
 
  1. `tc` is a name of a typeclass. The type of `tc` is `typeclass`, which is a builtin type. All typeclasses are of type
     `typeclass`.
- 2. `inst` is a name of a typeclass instance. The type of `inst` is `tc`.
+ 2. `nondefault` is a name of a typeclass nondefaultance. The type of `nondefault` is `tc`.
  3. The type of the unnamed default instance is also `tc`.
- 4. Values of type that is a typeclass can be used as a type. **Drafting note: this is somewhat unimportant for the time
-    being, at least until Vapor gets templates and/or dependent types, but shall be implemented from the start. In essence,
-    this allows to pass specific typeclass instances by-value by wrapping a value in them, but the exact specification of
-    that doesn't matter because it won't be useful until it can be inferred or passed in in any way.**
- 5. `fndecl` declared on line (2) is a declaration of a typeclass function. This function _must_ be defined by an instance
+ 4. Values of type `typeclass` are regular values and can be stored in runtime variables.
+ 5. Values of type that is a typeclass (that is, typeclass instances) can be used as a type. **Drafting note: this is
+    somewhat unimportant for the time being, at least until Vapor gets templates and/or dependent types, but shall be
+    implemented from the start. In essence, this allows to pass specific typeclass instances by-value by wrapping a value
+    in them, but the exact specification of that doesn't matter because it won't be useful until it can be inferred or
+    passed in in any way.**
+ 6. `fndecl` declared on line (B) is a declaration of a typeclass function. This function _must_ be defined by an instance
     for the instance to be valid.
- 6. `fndecl`s defined on lines (5) and (7) are implementations of the function declared on line (2).
- 7. `fndef` defined on line (3) is both a declaration of a typeclass function, and a default definition of such function.
+ 7. `fndecl`s defined on lines (E) and (G) are implementations of the function declared on line (B).
+ 8. `fndef` defined on line (C) is both a declaration of a typeclass function, and a default definition of such function.
     If any instance of `tc` doesn't override this implementation, it is going to be inherited from the typeclass definition.
     In other words, the default instance defined on line (4) uses this definition for its `fndef`.
- 8. `fndef` defined on line (8) is a definition of the typeclass function declared on line (3) that overrides the default
-    implementation. The instance `inst` uses this definition, and not the default one, as the definition of the typeclass
-    function declared on line (3).
+ 9. `fndef` defined on line (H) is a definition of the typeclass function declared on line (C) that overrides the default
+    implementation. The instance `nondefault` uses this definition, and not the default one, as the definition of the typeclass
+    function declared on line (C).
+ 10. `fndef` defined on line (H) doesn't specify the signature of the function. Specifying the signature of an instance
+    function is not required. If the signature is not specified, the original signature of the typeclass function is used.
+    If the signature of the function is specified, it has to be equivalent with the original signature of the typeclass
+    function.
 
 ### Access to typeclass and instance members
 
@@ -107,12 +113,15 @@ let default_instance = tc(int);
 When a call is made through a typeclass instance, the definition of a function belonging to that instance is looked up.
 
 ```
-tc(int).fndecl()                    // returns 0, because the definition (5) is used
+tc(int).fndecl()                    // returns 0, because the definition (E) is used
 default_instance.fndecl()           // equivalent to the above
-inst.fndecl()                       // returns 1, uses definition (7)
-tc(int).fndef(123)                  // returns 123, per definition (3)
-inst.fndef(123)                     // returns 122, per definition (8)
+nondefault.fndecl()                 // returns 1, uses definition (G)
+tc(int).fndef(123)                  // returns 123, per definition (C)
+nondefault.fndef(123)               // returns 122, per definition (H)
 ```
+
+It is a compilation error to refer to an instance that has not been defined. A default instance that would not be valid
+for arguments it is requested for is considered to not be defined; the compiler is however required to diagnose this problem.
 
 ## Operators
 
