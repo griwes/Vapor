@@ -123,6 +123,16 @@ nondefault.fndef(123)               // returns 122, per definition (H)
 It is a compilation error to refer to an instance that has not been defined. A default instance that would not be valid
 for arguments it is requested for is considered to not be defined; the compiler is however required to diagnose this problem.
 
+## Conversions
+
+A value of type `T` is convertible to a value of type "instance of a typeclass for type `T`".
+
+When a value of type whose type is a typeclass is requested and a value of other type is provided, that value is converted
+to a value of type "default instance of that typeclass for type `T`". **Drafting note: this will not actually come up until
+Vapor has proper type inference; namely, it's going to be mostly useful in constructs like
+`with (instance : some_tc) function foo(argument : instance) { ... }`, that is - the type is deduced, but the actual thing
+passed is an instance of `some_ct`. This paragraph makes it possible to pass values not yet wrapped in a typeclass instance.**
+
 ## Operators
 
 Every operator in the language is mapped to a specially recognized by the core language typeclass. Those typeclasses, listed
