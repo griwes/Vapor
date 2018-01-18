@@ -3,3 +3,4 @@ pages:
     - Home: index.md
     - Specification:
         - Introduction: spec/index.md
+        - Modules: spec/modules/index.md
