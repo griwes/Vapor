@@ -48,7 +48,8 @@ inline namespace _v1
                     },
                     [&](const parser::identifier & ident) -> std::unique_ptr<expression> {
                         return preanalyze_identifier(ctx, ident, lex_scope);
-                    }))),
+                    },
+                    [&](auto &&) -> std::unique_ptr<expression> { assert(0); }))),
             parse.modifier_type,
             fmap(parse.arguments, [&](auto && expr) { return preanalyze_expression(ctx, expr, lex_scope); }),
             fmap(parse.accessed_member, [&](auto && member) { return member.value.string; }));

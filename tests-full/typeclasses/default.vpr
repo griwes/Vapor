@@ -1,0 +1,24 @@
+// compile: {vprc} {input} -l -a -c
+// link: {cc} {input}.o {runtime} -o {input}.bin
+// run: {input}.bin 5
+
+module main
+{
+    typeclass test(t : type) {
+        function action(arg : t) -> t;
+    };
+
+    let int32 = sized_int(32);
+
+    default instance test(int32) {
+        function action(arg) {
+            return arg * 3 + 1;
+        }
+    };
+
+    let entry = lambda(arg : int32) {
+        return default(test(int32)).action(arg) - 16;
+    };
+}
+
+// vim: filetype=cpp

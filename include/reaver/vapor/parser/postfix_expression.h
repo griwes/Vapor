@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2014-2017 Michał "Griwes" Dominiak
+ * Copyright © 2014-2017, 2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -36,11 +36,15 @@ inline namespace _v1
 {
     struct expression;
     struct expression_list;
+    struct default_instance_expression;
 
     struct postfix_expression
     {
         range_type range;
-        std::variant<identifier, recursive_wrapper<expression_list>> base_expression = identifier();
+        std::variant<identifier,
+            recursive_wrapper<expression_list>,
+            recursive_wrapper<default_instance_expression>>
+            base_expression = identifier();
         std::optional<lexer::token_type> modifier_type = std::nullopt;
         std::vector<expression> arguments = {};
         std::optional<identifier> accessed_member = std::nullopt;

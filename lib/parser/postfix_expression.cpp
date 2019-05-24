@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2015-2017 Michał "Griwes" Dominiak
+ * Copyright © 2015-2017, 2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -79,19 +79,31 @@ inline namespace _v1
 
         position start, end;
 
-        if (peek(ctx, lexer::token_type::round_bracket_open))
-        {
-            start = expect(ctx, lexer::token_type::round_bracket_open).range.start();
-            ret.base_expression = parse_expression_list(ctx);
-            end = expect(ctx, lexer::token_type::round_bracket_close).range.end();
-        }
+        auto type = peek(ctx)->type;
 
-        else
+        switch (type)
         {
-            ret.base_expression = parse_literal<lexer::token_type::identifier>(ctx);
-            auto & range = std::get<identifier>(ret.base_expression).range;
-            start = range.start();
-            end = range.end();
+            case lexer::token_type::round_bracket_open:
+                start = expect(ctx, lexer::token_type::round_bracket_open).range.start();
+                ret.base_expression = parse_expression_list(ctx);
+                end = expect(ctx, lexer::token_type::round_bracket_close).range.end();
+                break;
+
+            case lexer::token_type::identifier:
+            {
+                ret.base_expression = parse_literal<lexer::token_type::identifier>(ctx);
+                auto & range = std::get<identifier>(ret.base_expression).range;
+                start = range.start();
+                end = range.end();
+                break;
+            }
+
+            case lexer::token_type::default_:
+                ret.base_expression = parse_default_instance_expression(ctx);
+                break;
+
+            default:
+                throw expectation_failure{ "postfix-expression", ctx.begin->string, ctx.begin->range };
         }
 
         auto modifier = get_if_valid_modifier();

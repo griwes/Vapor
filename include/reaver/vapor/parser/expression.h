@@ -44,6 +44,7 @@ inline namespace _v1
     struct struct_literal;
     struct typeclass_literal;
     struct instance_literal;
+    struct default_instance_expression;
 
     void print(const unary_expression & expr, std::ostream & os, std::size_t indent);
     void print(const binary_expression & expr, std::ostream & os, std::size_t indent);

@@ -58,6 +58,7 @@ inline namespace _v1
                 break;
 
             case lexer::token_type::identifier:
+            case lexer::token_type::default_:
                 ret.expression_value = parse_postfix_expression(ctx, mode);
                 break;
 

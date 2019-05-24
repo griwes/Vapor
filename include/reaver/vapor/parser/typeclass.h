@@ -53,17 +53,26 @@ inline namespace _v1
         instance_literal literal;
     };
 
+    struct default_instance_expression
+    {
+        range_type range;
+        expression instance_type;
+    };
+
     bool operator==(const typeclass_literal & lhs, const typeclass_literal & rhs);
     bool operator==(const instance_literal & lhs, const instance_literal & rhs);
     bool operator==(const default_instance_definition & lhs, const default_instance_definition & rhs);
+    bool operator==(const default_instance_expression & lhs, const default_instance_expression & rhs);
 
     typeclass_literal parse_typeclass_literal(context & ctx);
     declaration parse_typeclass_definition(context & ctx);
     instance_literal parse_instance_literal(context & ctx);
     default_instance_definition parse_default_instance(context & ctx);
+    default_instance_expression parse_default_instance_expression(context & ctx);
 
     void print(const typeclass_literal & lit, std::ostream & os, print_context ctx);
     void print(const instance_literal & def, std::ostream & os, print_context ctx);
     void print(const default_instance_definition & def, std::ostream & os, print_context ctx);
+    void print(const default_instance_expression & expr, std::ostream & os, print_context ctx);
 }
 }
