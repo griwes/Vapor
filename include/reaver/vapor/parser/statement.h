@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2014-2018 Michał "Griwes" Dominiak
+ * Copyright © 2014-2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -28,7 +28,6 @@
 
 #include "binary_expression.h"
 #include "declaration.h"
-#include "expression_list.h"
 #include "function.h"
 #include "helpers.h"
 #include "if_statement.h"
@@ -51,11 +50,11 @@ inline namespace _v1
         range_type range;
         std::variant<declaration,
             default_instance_definition,
+            expression,
             return_expression,
-            expression_list,
             function_definition,
             if_statement>
-            statement_value = expression_list();
+            statement_value = declaration();
     };
 
     bool operator==(const statement & lhs, const statement & rhs);

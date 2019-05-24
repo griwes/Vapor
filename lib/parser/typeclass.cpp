@@ -125,7 +125,14 @@ inline namespace _v1
         ret.typeclass_name = parse_id_expression(ctx);
 
         expect(ctx, lexer::token_type::round_bracket_open);
-        ret.arguments = parse_expression_list(ctx);
+        while (true)
+        {
+            ret.arguments.push_back(parse_expression(ctx));
+            if (!peek(ctx, lexer::token_type::comma))
+            {
+                break;
+            }
+        }
         expect(ctx, lexer::token_type::round_bracket_close);
 
         expect(ctx, lexer::token_type::curly_bracket_open);
@@ -199,12 +206,16 @@ inline namespace _v1
 
         auto args_ctx = ctx.make_branch(false);
         os << styles::def << args_ctx << styles::subrule_name << "arguments:\n";
-        print(lit.arguments, os, args_ctx.make_branch(true));
+        std::size_t idx = 0;
+        for (auto && arg : lit.arguments)
+        {
+            print(arg, os, args_ctx.make_branch(++idx == lit.arguments.size()));
+        }
 
         auto defs_ctx = ctx.make_branch(true);
         os << styles::def << defs_ctx << styles::subrule_name << "definitions:\n";
 
-        std::size_t idx = 0;
+        idx = 0;
         for (auto && def : lit.definitions)
         {
             fmap(def, [&](auto && def) {

@@ -22,7 +22,6 @@
 
 #include "vapor/analyzer/expressions/typeclass_instance.h"
 
-#include "vapor/analyzer/expressions/expression_list.h"
 #include "vapor/analyzer/expressions/typeclass.h"
 #include "vapor/analyzer/semantic/symbol.h"
 #include "vapor/analyzer/semantic/typeclass_instance.h"

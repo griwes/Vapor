@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include "expression.h"
+
 #include "binary_expression.h"
 #include "lambda_expression.h"
 #include "struct.h"

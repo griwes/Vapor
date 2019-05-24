@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2015-2017 Michał "Griwes" Dominiak
+ * Copyright © 2015-2017, 2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -49,7 +49,7 @@ inline namespace _v1
             else if (peek(ctx, lexer::token_type::block_value))
             {
                 expect(ctx, lexer::token_type::block_value);
-                ret.value_expression = parse_expression_list(ctx);
+                ret.value_expression = parse_expression(ctx);
                 break;
             }
 
@@ -73,7 +73,7 @@ inline namespace _v1
         auto start = expect(ctx, lexer::token_type::block_value).range.start();
         auto expr = parse_expression(ctx);
         ret.range = { start, expr.range.end() };
-        ret.value_expression = expression_list{ expr.range, { std::move(expr) } };
+        ret.value_expression = std::move(expr);
 
         return ret;
     }

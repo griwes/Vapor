@@ -24,7 +24,6 @@
 
 #include <reaver/prelude/fold.h>
 
-#include "vapor/analyzer/expressions/expression_list.h"
 #include "vapor/analyzer/semantic/symbol.h"
 #include "vapor/analyzer/statements/block.h"
 #include "vapor/analyzer/statements/return.h"
@@ -68,7 +67,7 @@ inline namespace _v1
             lex_scope,
             std::move(statements),
             fmap(parse.value_expression,
-                [&](auto && val_expr) { return preanalyze_expression_list(ctx, val_expr, scope_ptr); }),
+                [&](auto && val_expr) { return preanalyze_expression(ctx, val_expr, scope_ptr); }),
             is_top_level);
     }
 

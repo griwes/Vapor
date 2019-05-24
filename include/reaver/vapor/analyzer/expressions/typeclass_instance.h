@@ -31,7 +31,6 @@ namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
-    class expression_list;
     class function_definition;
     class typeclass_instance;
     class typeclass_expression;

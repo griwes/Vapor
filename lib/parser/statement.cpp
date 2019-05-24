@@ -140,10 +140,10 @@ inline namespace _v1
             default:
                 if (export_)
                 {
-                    throw expectation_failure{ "exported-declaration", U"expression-list", ctx.begin->range };
+                    throw expectation_failure{ "exported-declaration", U"expression", ctx.begin->range };
                 }
 
-                ret.statement_value = parse_expression_list(ctx);
+                ret.statement_value = parse_expression(ctx);
         }
 
         auto end = expect(ctx, lexer::token_type::semicolon).range.end();

@@ -23,7 +23,6 @@
 #include <reaver/prelude/fold.h>
 
 #include "vapor/analyzer/expressions/call.h"
-#include "vapor/analyzer/expressions/expression_list.h"
 #include "vapor/analyzer/expressions/identifier.h"
 #include "vapor/analyzer/expressions/member.h"
 #include "vapor/analyzer/expressions/postfix.h"
@@ -43,11 +42,11 @@ inline namespace _v1
         return std::make_unique<postfix_expression>(make_node(parse),
             std::get<0>(fmap(parse.base_expression,
                 make_overload_set(
-                    [&](const parser::expression_list & expr_list) -> std::unique_ptr<expression> {
-                        return preanalyze_expression_list(ctx, expr_list, lex_scope);
-                    },
                     [&](const parser::identifier & ident) -> std::unique_ptr<expression> {
                         return preanalyze_identifier(ctx, ident, lex_scope);
+                    },
+                    [&](const parser::expression & expr) -> std::unique_ptr<expression> {
+                        return preanalyze_expression(ctx, expr, lex_scope);
                     },
                     [&](auto &&) -> std::unique_ptr<expression> { assert(0); }))),
             parse.modifier_type,

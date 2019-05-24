@@ -43,7 +43,7 @@ inline namespace _v1
     {
         range_type range;
         id_expression typeclass_name;
-        expression_list arguments;
+        std::vector<expression> arguments;
         std::vector<std::variant<function_definition>> definitions;
     };
 

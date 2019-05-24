@@ -38,7 +38,6 @@ namespace reaver::vapor::parser
 inline namespace _v1
 {
     struct expression;
-    struct expression_list;
 }
 }
 

@@ -48,8 +48,7 @@ inline namespace _v1
         return std::make_unique<typeclass_instance>(make_node(parse),
             std::move(scope),
             fmap(parse.typeclass_name.id_expression_value, [&](auto && t) { return t.value.string; }),
-            fmap(parse.arguments.expressions,
-                [&](auto && arg) { return preanalyze_expression(ctx, arg, scope_ptr); }));
+            fmap(parse.arguments, [&](auto && arg) { return preanalyze_expression(ctx, arg, scope_ptr); }));
     }
 
     std::unique_ptr<typeclass_instance> import_typeclass_instance(precontext & ctx,

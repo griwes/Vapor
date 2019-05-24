@@ -22,7 +22,6 @@
 
 #include "vapor/parser/postfix_expression.h"
 #include "vapor/parser/expr.h"
-#include "vapor/parser/expression_list.h"
 #include "vapor/parser/helpers.h"
 
 namespace reaver::vapor::parser
@@ -85,7 +84,7 @@ inline namespace _v1
         {
             case lexer::token_type::round_bracket_open:
                 start = expect(ctx, lexer::token_type::round_bracket_open).range.start();
-                ret.base_expression = parse_expression_list(ctx);
+                ret.base_expression = parse_expression(ctx);
                 end = expect(ctx, lexer::token_type::round_bracket_close).range.end();
                 break;
 
@@ -151,8 +150,7 @@ inline namespace _v1
 
             auto base = std::move(ret);
             ret = {};
-            expression_list base_list = { base.range, { expression{ base.range, std::move(base) } } };
-            ret.base_expression = std::move(base_list);
+            ret.base_expression = expression{ base.range, std::move(base) };
         }
 
         return ret;

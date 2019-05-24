@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2014-2017 Michał "Griwes" Dominiak
+ * Copyright © 2014-2017, 2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -23,7 +23,6 @@
 #pragma once
 
 #include "../range.h"
-#include "expression_list.h"
 #include "helpers.h"
 #include "statement.h"
 
@@ -37,7 +36,7 @@ inline namespace _v1
     {
         range_type range;
         std::vector<std::variant<recursive_wrapper<block>, recursive_wrapper<statement>>> block_value;
-        std::optional<expression_list> value_expression;
+        std::optional<expression> value_expression;
     };
 
     bool operator==(const block & lhs, const block & rhs);
@@ -45,7 +44,7 @@ inline namespace _v1
     block parse_block(context & ctx);
     block parse_single_statement_block(context & ctx);
 
-    void print(const expression_list & list, std::ostream & os, print_context ctx);
+    void print(const expression & expr, std::ostream & os, print_context ctx);
     void print(const block & bl, std::ostream & os, print_context ctx);
 }
 }

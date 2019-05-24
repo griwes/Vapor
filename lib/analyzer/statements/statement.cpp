@@ -52,11 +52,6 @@ inline namespace _v1
                     return ret;
                 },
 
-                [](const parser::expression_list & expr_list) -> std::unique_ptr<statement> {
-                    assert(0);
-                    return std::unique_ptr<expression>();
-                },
-
                 [&](const parser::function_definition & func) -> std::unique_ptr<statement> {
                     auto ret = preanalyze_function_definition(ctx, func, lex_scope);
                     return ret;
