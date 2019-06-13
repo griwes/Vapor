@@ -35,16 +35,11 @@ namespace reaver::vapor::parser
 inline namespace _v1
 {
     struct expression;
-    struct default_instance_expression;
 
     struct postfix_expression
     {
         range_type range;
-        std::variant<identifier,
-            // ...clang format breaks the line above after `std::` without this...
-            recursive_wrapper<expression>,
-            recursive_wrapper<default_instance_expression>>
-            base_expression = identifier();
+        std::variant<identifier, recursive_wrapper<expression>> base_expression = identifier();
         std::optional<lexer::token_type> modifier_type = std::nullopt;
         std::vector<expression> arguments = {};
         std::optional<identifier> accessed_member = std::nullopt;

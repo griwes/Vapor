@@ -43,11 +43,6 @@ inline namespace _v1
         return lhs.range == rhs.range && lhs.literal == rhs.literal;
     }
 
-    bool operator==(const default_instance_expression & lhs, const default_instance_expression & rhs)
-    {
-        return lhs.range == rhs.range && lhs.instance_type == rhs.instance_type;
-    }
-
     namespace
     {
         struct named_typeclass
@@ -158,19 +153,6 @@ inline namespace _v1
         return ret;
     }
 
-    default_instance_expression parse_default_instance_expression(context & ctx)
-    {
-        default_instance_expression ret;
-
-        auto start = expect(ctx, lexer::token_type::default_).range.start();
-        expect(ctx, lexer::token_type::round_bracket_open);
-        ret.instance_type = parse_expression(ctx);
-        auto end = expect(ctx, lexer::token_type::round_bracket_close).range.end();
-        ret.range = { start, end };
-
-        return ret;
-    }
-
     void print(const typeclass_literal & lit, std::ostream & os, print_context ctx)
     {
         os << styles::def << ctx << styles::rule_name << "typeclass-literal";
@@ -234,17 +216,6 @@ inline namespace _v1
         auto literal_ctx = ctx.make_branch(true);
         os << styles::def << literal_ctx << styles::subrule_name << "instance-literal:\n";
         print(def.literal, os, literal_ctx.make_branch(true));
-    }
-
-    void print(const default_instance_expression & expr, std::ostream & os, print_context ctx)
-    {
-        os << styles::def << ctx << styles::rule_name << "default-instance-expression";
-        print_address_range(os, expr);
-        os << '\n';
-
-        auto tct_ctx = ctx.make_branch(true);
-        os << styles::def << tct_ctx << styles::subrule_name << "typeclass-instance-type:\n";
-        print(expr.instance_type, os, tct_ctx.make_branch(true));
     }
 }
 }

@@ -1,4 +1,5 @@
 /**
+
  * Vapor Compiler Licence
  *
  * Copyright © 2015-2017, 2019 Michał "Griwes" Dominiak
@@ -89,17 +90,16 @@ inline namespace _v1
                 break;
 
             case lexer::token_type::identifier:
+            case lexer::token_type::default_:
             {
-                ret.base_expression = parse_literal<lexer::token_type::identifier>(ctx);
+                ret.base_expression = type == lexer::token_type::default_
+                    ? parse_literal<lexer::token_type::identifier, lexer::token_type::default_>(ctx)
+                    : parse_literal<lexer::token_type::identifier>(ctx);
                 auto & range = std::get<identifier>(ret.base_expression).range;
                 start = range.start();
                 end = range.end();
                 break;
             }
-
-            case lexer::token_type::default_:
-                ret.base_expression = parse_default_instance_expression(ctx);
-                break;
 
             default:
                 throw expectation_failure{ "postfix-expression", ctx.begin->string, ctx.begin->range };

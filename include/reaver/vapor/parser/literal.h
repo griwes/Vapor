@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2014-2017 Michał "Griwes" Dominiak
+ * Copyright © 2014-2017, 2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -52,12 +52,20 @@ inline namespace _v1
 
     using identifier = literal<lexer::token_type::identifier>;
 
-    template<lexer::token_type TokenType>
+    template<lexer::token_type TokenType, lexer::token_type ToExpect = TokenType>
     auto parse_literal(context & ctx)
     {
         literal<TokenType> ret;
 
-        ret.value = expect(ctx, TokenType);
+        if constexpr (TokenType == ToExpect)
+        {
+            ret.value = expect(ctx, TokenType);
+        }
+        else
+        {
+            ret.value = expect(ctx, ToExpect);
+            ret.value.type = ToExpect;
+        }
 
         auto start = ret.value.range.start();
         auto end = ret.value.range.end();
