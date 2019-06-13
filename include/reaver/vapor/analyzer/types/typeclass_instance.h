@@ -33,6 +33,7 @@ inline namespace _v1
 {
     class typeclass;
     class block;
+    class default_instance;
 
     class typeclass_instance_type : public type, public std::enable_shared_from_this<typeclass_instance_type>
     {
@@ -56,6 +57,9 @@ inline namespace _v1
         {
             return _ctx.tc;
         }
+
+        void add_default_instance_definition(default_instance *);
+        future<std::unique_ptr<expression>> get_default_instance_expr(analysis_context &) const;
 
     private:
         struct _function_instance

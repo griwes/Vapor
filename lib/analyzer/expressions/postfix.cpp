@@ -23,6 +23,7 @@
 #include <reaver/prelude/fold.h>
 
 #include "vapor/analyzer/expressions/call.h"
+#include "vapor/analyzer/expressions/default_instance.h"
 #include "vapor/analyzer/expressions/identifier.h"
 #include "vapor/analyzer/expressions/member.h"
 #include "vapor/analyzer/expressions/postfix.h"
@@ -47,6 +48,9 @@ inline namespace _v1
                     },
                     [&](const parser::expression & expr) -> std::unique_ptr<expression> {
                         return preanalyze_expression(ctx, expr, lex_scope);
+                    },
+                    [&](const parser::default_instance_expression & expr) -> std::unique_ptr<expression> {
+                        return preanalyze_default_instance_expression(ctx, expr, lex_scope);
                     },
                     [&](auto &&) -> std::unique_ptr<expression> { assert(0); }))),
             parse.modifier_type,

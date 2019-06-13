@@ -54,6 +54,8 @@ inline namespace _v1
         virtual std::unordered_set<expression *> get_associated_entities() const override;
         virtual void mark_exported() override;
 
+        future<typeclass_instance_type *> get_instance_type_future() const;
+
     private:
         virtual void _set_name(std::u32string name) override;
 
@@ -67,6 +69,7 @@ inline namespace _v1
         std::optional<late_preanalysis_type> _late_preanalysis;
         std::shared_ptr<typeclass_instance> _instance;
         typeclass_expression * _tc = nullptr;
+        std::optional<future<typeclass_instance_type *>> _instance_type_future;
     };
 }
 }

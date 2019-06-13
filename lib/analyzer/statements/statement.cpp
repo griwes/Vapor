@@ -27,6 +27,7 @@
 #include "vapor/analyzer/semantic/function.h"
 #include "vapor/analyzer/semantic/symbol.h"
 #include "vapor/analyzer/statements/declaration.h"
+#include "vapor/analyzer/statements/default_instance.h"
 #include "vapor/analyzer/statements/function.h"
 #include "vapor/analyzer/statements/if.h"
 #include "vapor/analyzer/statements/return.h"
@@ -44,6 +45,11 @@ inline namespace _v1
             make_overload_set(
                 [&](const parser::declaration & decl) -> std::unique_ptr<statement> {
                     auto ret = preanalyze_declaration(ctx, decl, lex_scope);
+                    return ret;
+                },
+
+                [&](const parser::default_instance_definition & defn) -> std::unique_ptr<statement> {
+                    auto ret = preanalyze_default_instance(ctx, defn, lex_scope);
                     return ret;
                 },
 

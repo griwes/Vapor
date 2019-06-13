@@ -46,27 +46,9 @@ inline namespace _v1
 
         future<> analyze(analysis_context & ctx)
         {
-            if (!_is_future_assigned)
+            if (!_analysis_future)
             {
-                std::lock_guard<std::mutex> lock{ _future_lock };
-                if (!_is_future_assigned)
-                {
-                    _analysis_future = _analyze(ctx);
-                    _analysis_future
-                        ->on_error([](std::exception_ptr ptr) {
-                            try
-                            {
-                                std::rethrow_exception(ptr);
-                            }
-
-                            catch (...)
-                            {
-                                std::terminate();
-                            }
-                        })
-                        .detach(); // this is wrooong
-                    _is_future_assigned = true;
-                }
+                _analysis_future = _analyze(ctx);
             }
 
             return *_analysis_future;
@@ -169,8 +151,6 @@ inline namespace _v1
 
         virtual statement_ir _codegen_ir(ir_generation_context &) const = 0;
 
-        std::mutex _future_lock;
-        std::atomic<bool> _is_future_assigned{ false };
         std::optional<future<>> _analysis_future;
         mutable std::optional<statement_ir> _ir;
 

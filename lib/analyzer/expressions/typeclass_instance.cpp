@@ -138,6 +138,12 @@ inline namespace _v1
         return ret;
     }
 
+    future<typeclass_instance_type *> typeclass_instance_expression::get_instance_type_future() const
+    {
+        assert(_instance_type_future);
+        return _instance_type_future.value();
+    }
+
     void typeclass_instance_expression::_set_name(std::u32string name)
     {
         _instance->set_name(std::move(name));
@@ -201,6 +207,8 @@ inline namespace _v1
                             return tc_type;
                         });
                 })));
+
+        _instance_type_future = type;
 
         return type.then([&](auto instance_type) {
             _set_type(instance_type);

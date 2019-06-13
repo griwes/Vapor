@@ -55,16 +55,18 @@ inline namespace _v1
 
     class analysis_context
     {
+        analysis_context(future_promise_pair<void> default_instance_setup);
+
     public:
-        analysis_context()
-            : results{ std::make_shared<cached_results>() },
-              simplification_ctx{ std::make_shared<simplification_context>(*results) }
-        {
-        }
+        analysis_context();
 
         sized_integer * get_sized_integer_type(std::size_t size);
         function_type * get_function_type(function_signature sig);
         typeclass_type * get_typeclass_type(std::vector<type *> param_types);
+
+        future<> default_instances_future() const;
+        void set_default_instance_definition_count(std::size_t count);
+        void mark_default_instance_definition_processed();
 
         std::shared_ptr<cached_results> results;
         std::shared_ptr<simplification_context> simplification_ctx;
@@ -73,6 +75,10 @@ inline namespace _v1
         bool entry_variable_marked = false;
 
     private:
+        std::size_t _unprocessed_default_instance_definitions = 0;
+        future<> _default_instances_future;
+        manual_promise<void> _default_instances_promise;
+
         std::unordered_map<std::size_t, std::shared_ptr<sized_integer>> _sized_integers;
         std::unordered_map<function_signature, std::shared_ptr<function_type>> _function_types;
         std::unordered_map<std::vector<type *>,

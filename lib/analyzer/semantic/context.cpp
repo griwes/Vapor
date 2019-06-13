@@ -73,6 +73,18 @@ inline namespace _v1
         return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin());
     }
 
+    analysis_context::analysis_context(future_promise_pair<void> default_instance_setup)
+        : results{ std::make_shared<cached_results>() },
+          simplification_ctx{ std::make_shared<simplification_context>(*results) },
+          _default_instances_future{ std::move(default_instance_setup.future) },
+          _default_instances_promise{ std::move(default_instance_setup.promise) }
+    {
+    }
+
+    analysis_context::analysis_context() : analysis_context{ make_promise<void>() }
+    {
+    }
+
     sized_integer * analysis_context::get_sized_integer_type(std::size_t size)
     {
         auto & ret = _sized_integers[size];
@@ -104,6 +116,30 @@ inline namespace _v1
         }
 
         return ret.get();
+    }
+
+    future<> analysis_context::default_instances_future() const
+    {
+        return _default_instances_future;
+    }
+
+    void analysis_context::set_default_instance_definition_count(std::size_t count)
+    {
+        assert(_unprocessed_default_instance_definitions == 0);
+        _unprocessed_default_instance_definitions = count;
+
+        if (count == 0)
+        {
+            _default_instances_promise.set();
+        }
+    }
+
+    void analysis_context::mark_default_instance_definition_processed()
+    {
+        if (--_unprocessed_default_instance_definitions == 0)
+        {
+            _default_instances_promise.set();
+        }
     }
 }
 }

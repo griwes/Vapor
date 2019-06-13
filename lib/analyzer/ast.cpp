@@ -56,6 +56,8 @@ inline namespace _v1
             }
 
             _global_scope->close();
+
+            _proper.set_default_instance_definition_count(_ctx.default_instance_definition_count);
         }
 
         catch (exception & e)

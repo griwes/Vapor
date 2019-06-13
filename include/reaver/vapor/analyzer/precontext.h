@@ -94,6 +94,8 @@ inline namespace _v1
         std::string current_symbol = {};
 
         std::vector<std::shared_ptr<proto::ast>> imported_asts = {};
+
+        std::size_t default_instance_definition_count = {};
     };
 }
 }

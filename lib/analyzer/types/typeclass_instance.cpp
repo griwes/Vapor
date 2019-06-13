@@ -138,6 +138,17 @@ inline namespace _v1
         return ret;
     }
 
+    void typeclass_instance_type::add_default_instance_definition(default_instance *)
+    {
+        assert(0);
+    }
+
+    future<std::unique_ptr<expression>> typeclass_instance_type::get_default_instance_expr(
+        analysis_context & ctx) const
+    {
+        return ctx.default_instances_future().then([&]() -> std::unique_ptr<expression> { assert(0); });
+    }
+
     future<> typeclass_instance_type::_analyze(analysis_context & ctx)
     {
         return when_all(fmap(_function_instances, [&](auto && instance) {
