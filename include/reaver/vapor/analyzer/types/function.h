@@ -75,8 +75,6 @@ inline namespace _v1
 
         type * _return;
         std::vector<type *> _parameters;
-        std::vector<std::unique_ptr<expression>> _params;
-
         std::unique_ptr<function> _call_operator;
     };
 

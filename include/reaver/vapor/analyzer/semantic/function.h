@@ -172,6 +172,12 @@ inline namespace _v1
             _compile_time_eval = std::move(eval);
         }
 
+        void set_parameters(std::vector<std::unique_ptr<expression>> params)
+        {
+            _owned_parameters = std::move(params);
+            _parameters = fmap(_owned_parameters, [&](auto && param) { return param.get(); });
+        }
+
         void set_parameters(std::vector<expression *> params)
         {
             _parameters = std::move(params);
@@ -233,6 +239,7 @@ inline namespace _v1
         bool _is_intrinsic = false;
         bool _is_exported = false;
         std::optional<std::size_t> _vtable_id;
+        std::vector<std::unique_ptr<expression>> _owned_parameters;
         std::vector<expression *> _parameters;
         std::optional<std::u32string> _name;
         std::optional<function_codegen> _codegen;

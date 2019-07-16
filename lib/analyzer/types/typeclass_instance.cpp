@@ -138,8 +138,12 @@ inline namespace _v1
         return ret;
     }
 
-    void typeclass_instance_type::add_default_instance_definition(default_instance *)
+    void typeclass_instance_type::add_default_instance_definition(analysis_context & ctx,
+        default_instance * inst)
     {
+        // instance transformed function
+        auto itf = make_function("default instance selector");
+
         assert(0);
     }
 

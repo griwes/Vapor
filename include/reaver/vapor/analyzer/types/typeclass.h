@@ -59,7 +59,6 @@ inline namespace _v1
 
         std::vector<type *> _param_types;
         std::unique_ptr<function> _call_operator;
-        std::vector<std::unique_ptr<expression>> _call_operator_params;
     };
 }
 }

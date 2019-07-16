@@ -63,7 +63,7 @@ inline namespace _v1
 
         virtual future<function *> get_constructor(std::vector<const expression *>) const override
         {
-            return _aggregate_ctor_future.value();
+            return _aggregate_ctor_pair.future;
         }
 
         virtual future<std::vector<function *>> get_candidates(lexer::token_type op) const override
@@ -73,8 +73,10 @@ inline namespace _v1
                 return make_ready_future(std::vector<function *>{});
             }
 
-            return _aggregate_copy_ctor_future->then(
-                [](auto && ctor) { return std::vector<function *>{ ctor }; });
+            // remove the const_cast when moving to revamped futures
+            return const_cast<future<function *> &>(_aggregate_copy_ctor_pair.future).then([](auto && ctor) {
+                return std::vector<function *>{ ctor };
+            });
         }
 
         auto get_ast_info() const
@@ -118,14 +120,11 @@ inline namespace _v1
         std::vector<member_expression *> _data_members;
 
         std::unique_ptr<function> _aggregate_ctor;
-        mutable std::optional<future<function *>> _aggregate_ctor_future;
-        std::optional<manual_promise<function *>> _aggregate_ctor_promise;
+        future_promise_pair<function *> _aggregate_ctor_pair;
 
         std::unique_ptr<function> _aggregate_copy_ctor;
-        mutable std::optional<future<function *>> _aggregate_copy_ctor_future;
-        std::optional<manual_promise<function *>> _aggregate_copy_ctor_promise;
-        std::unique_ptr<expression> _this_argument;
-        std::vector<std::unique_ptr<expression>> _member_copy_arguments;
+        future_promise_pair<function *> _aggregate_copy_ctor_pair;
+        std::vector<std::unique_ptr<expression>> _default_copy_arguments;
 
         virtual std::u32string _codegen_name(ir_generation_context & ctx) const override
         {

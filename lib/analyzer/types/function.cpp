@@ -32,15 +32,15 @@ namespace reaver::vapor::analyzer
 inline namespace _v1
 {
     function_type::function_type(type * ret, std::vector<type *> params)
-        : _return{ ret },
-          _parameters{ std::move(params) },
-          _params{ fmap(_parameters, [&](auto && param_type) { return make_runtime_value(param_type); }) }
+        : _return{ ret }, _parameters{ std::move(params) }
     {
-        _params.insert(_params.begin(), make_runtime_value(this));
+        auto call_operator_params =
+            fmap(_parameters, [&](auto && param_type) { return make_runtime_value(param_type); });
+        call_operator_params.insert(call_operator_params.begin(), make_runtime_value(this));
 
         _call_operator = make_function("function type " + function_type::explain() + " call operator");
         _call_operator->set_return_type(_return->get_expression());
-        _call_operator->set_parameters(fmap(_params, [](auto && expr) { return expr.get(); }));
+        _call_operator->set_parameters(std::move(call_operator_params));
 
         _call_operator->make_member();
 

@@ -45,35 +45,28 @@ inline namespace _v1
             return make_ready_future(std::vector<function *>{});
         }
 
-        auto expr = make_runtime_value(builtin_types().unconstrained.get());
-
-        auto overload = make_function("member assignment");
-        overload->set_return_type(assigned_type()->get_expression());
-        overload->set_parameters({ _expr, expr.get() });
-        overload->add_analysis_hook([this](auto &&, auto && call_expr, std::vector<expression *> args) {
-            assert(args.size() == 2);
-            _expr->set_rhs(args.back());
-            call_expr->replace_with(make_expression_ref(_expr, call_expr->get_ast_info()));
-
-            return make_ready_future();
-        });
-        overload->set_eval([this](auto &&...) -> future<expression *> {
-            assert(
-                0); // need to pass this in a way that conveys the information that this isn't the owner of it
-            // (or a way to make it the owner of it, which I guess should be doable since this is eval)
-            // return make_ready_future(make_variable_ref_expression(_var).release());
-        });
-
-        auto ret = overload.get();
-
+        if (!_fun_storage)
         {
-            // TODO: this is useless, move the generation of the overload to the constructor
-            std::lock_guard<std::mutex> lock{ _storage_lock };
-            _fun_storage.push_back(std::move(overload));
-            _expr_storage.push_back(std::move(expr));
+            auto overload = make_function("member assignment");
+            overload->set_return_type(assigned_type()->get_expression());
+            overload->set_parameters([&] {
+                std::vector<std::unique_ptr<expression>> ret;
+                ret.push_back(make_expression_ref(_expr, _expr->get_ast_info()));
+                ret.push_back(make_runtime_value(builtin_types().unconstrained.get()));
+                return ret;
+            }());
+            overload->add_analysis_hook([this](auto &&, auto && call_expr, std::vector<expression *> args) {
+                assert(args.size() == 2);
+                _expr->set_rhs(args.back());
+                call_expr->replace_with(make_expression_ref(_expr, call_expr->get_ast_info()));
+
+                return make_ready_future();
+            });
+
+            _fun_storage = std::move(overload);
         }
 
-        return make_ready_future(std::vector<function *>{ ret });
+        return make_ready_future(std::vector<function *>{ _fun_storage->get() });
     }
 }
 }

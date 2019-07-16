@@ -101,15 +101,10 @@ inline namespace _v1
         std::vector<std::unique_ptr<declaration>> member_decls)
         : user_defined_type{ std::move(member_scope) },
           _parse{ parse },
-          _data_member_declarations{ std::move(member_decls) }
+          _data_member_declarations{ std::move(member_decls) },
+          _aggregate_ctor_pair{ make_promise<function *>() },
+          _aggregate_copy_ctor_pair{ make_promise<function *>() }
     {
-        auto ctor_pair = make_promise<function *>();
-        _aggregate_ctor_future = std::move(ctor_pair.future);
-        _aggregate_ctor_promise = std::move(ctor_pair.promise);
-
-        auto copy_pair = make_promise<function *>();
-        _aggregate_copy_ctor_future = std::move(copy_pair.future);
-        _aggregate_copy_ctor_promise = std::move(copy_pair.promise);
     }
 
     void struct_type::generate_constructors()
@@ -177,26 +172,24 @@ inline namespace _v1
 
         _aggregate_ctor->set_name(U"constructor");
 
-        _aggregate_ctor_promise->set(_aggregate_ctor.get());
+        _aggregate_ctor_pair.promise.set(_aggregate_ctor.get());
 
-        auto data_members = fmap(_data_members, [&](auto && member) -> expression * {
+        auto data_members = fmap(_data_members, [&](auto && member) -> std::unique_ptr<expression> {
             auto param = make_member_expression(this, member->get_name(), member->get_type());
             auto def_value = make_member_access_expression(member->get_name(), member->get_type());
 
             param->set_default_value(def_value.get());
-
-            auto param_ptr = param.get();
-            _member_copy_arguments.push_back(std::move(param));
-            _member_copy_arguments.push_back(std::move(def_value));
-            return param_ptr;
+            _default_copy_arguments.push_back(std::move(def_value));
+            return param;
         });
 
-        _this_argument = make_runtime_value(this);
-        data_members.insert(data_members.begin(), _this_argument.get());
+        data_members.insert(data_members.begin(), make_runtime_value(this));
 
+        // TODO: this really shouldn't be modelled as a function
+        // the default constructor maybe (though not necessarily), but this - definitely not
         _aggregate_copy_ctor = make_function("struct type copy replacement constructor");
         _aggregate_copy_ctor->set_return_type(get_expression());
-        _aggregate_copy_ctor->set_parameters(data_members);
+        _aggregate_copy_ctor->set_parameters(std::move(data_members));
         _aggregate_copy_ctor->set_codegen([&](auto && ctx) -> codegen::ir::function {
             auto ir_type = this->codegen_type(ctx);
             auto args = fmap(_data_members, [&](auto && member) {
@@ -235,9 +228,9 @@ inline namespace _v1
 
             if (base->get_type() != this
                 || !std::equal(
-                       args.begin(), args.end(), _data_members.begin(), [](auto && arg, auto && member) {
-                           return arg->get_type() == member->get_type();
-                       }))
+                    args.begin(), args.end(), _data_members.begin(), [](auto && arg, auto && member) {
+                        return arg->get_type() == member->get_type();
+                    }))
             {
                 logger::default_logger().sync();
                 assert(0);
@@ -268,7 +261,7 @@ inline namespace _v1
         _aggregate_copy_ctor->set_name(U"replacing_copy_constructor");
         _aggregate_copy_ctor->make_member();
 
-        _aggregate_copy_ctor_promise->set(_aggregate_copy_ctor.get());
+        _aggregate_copy_ctor_pair.promise.set(_aggregate_copy_ctor.get());
     }
 
     void struct_type::_codegen_type(ir_generation_context & ctx,

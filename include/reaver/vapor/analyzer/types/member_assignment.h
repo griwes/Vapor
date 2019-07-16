@@ -104,9 +104,7 @@ inline namespace _v1
         bool _assigned = false;
         std::unique_ptr<type> _assigned_type;
 
-        mutable std::mutex _storage_lock;
-        mutable std::vector<std::unique_ptr<function>> _fun_storage;
-        mutable std::vector<std::unique_ptr<expression>> _expr_storage;
+        mutable std::optional<std::unique_ptr<function>> _fun_storage;
     };
 
     inline std::unique_ptr<member_assignment_type> make_member_assignment_type(std::u32string member_name,

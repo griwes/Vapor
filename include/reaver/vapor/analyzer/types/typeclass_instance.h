@@ -58,7 +58,7 @@ inline namespace _v1
             return _ctx.tc;
         }
 
-        void add_default_instance_definition(default_instance *);
+        void add_default_instance_definition(analysis_context &, default_instance *);
         future<std::unique_ptr<expression>> get_default_instance_expr(analysis_context &) const;
 
     private:

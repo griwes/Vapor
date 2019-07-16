@@ -31,6 +31,7 @@ inline namespace _v1
 {
     class sized_integer;
     class function_type;
+    class typeclass;
     class typeclass_type;
 
     struct argument_list_hash
@@ -86,6 +87,7 @@ inline namespace _v1
             parameter_type_list_hash,
             parameter_type_list_compare>
             _typeclass_types;
+        std::unordered_map<typeclass *, std::vector<std::shared_ptr<function>>> _typeclass_default_instances;
     };
 }
 }

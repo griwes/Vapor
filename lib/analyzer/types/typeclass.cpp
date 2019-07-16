@@ -41,12 +41,11 @@ inline namespace _v1
         : _param_types{ std::move(param_types) },
           _call_operator{ make_function("typeclass type call operator") }
     {
-        _call_operator_params = fmap(_param_types, [](auto && type) { return make_runtime_value(type); });
-        _call_operator_params.insert(_call_operator_params.begin(), make_runtime_value(this));
+        auto call_operator_params = fmap(_param_types, [](auto && type) { return make_runtime_value(type); });
+        call_operator_params.insert(call_operator_params.begin(), make_runtime_value(this));
 
         _call_operator->set_return_type(builtin_types().type->get_expression());
-        auto params = fmap(_call_operator_params, [](auto && param) { return param.get(); });
-        _call_operator->set_parameters(std::move(params));
+        _call_operator->set_parameters(std::move(call_operator_params));
         _call_operator->make_member();
 
         _call_operator->add_analysis_hook(

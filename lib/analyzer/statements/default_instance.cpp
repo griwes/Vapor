@@ -62,7 +62,7 @@ inline namespace _v1
 
         return _instance->get_instance_type_future().then(
             [&, rest = std::move(instance_analysis)](auto instance_type) {
-                instance_type->add_default_instance_definition(this);
+                instance_type->add_default_instance_definition(ctx, this);
                 return rest;
             });
     }
