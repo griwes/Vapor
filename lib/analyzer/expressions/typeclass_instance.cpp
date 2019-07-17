@@ -144,6 +144,11 @@ inline namespace _v1
         return _instance_type_future.value();
     }
 
+    typeclass_instance * typeclass_instance_expression::get_instance() const
+    {
+        return _instance.get();
+    }
+
     void typeclass_instance_expression::_set_name(std::u32string name)
     {
         _instance->set_name(std::move(name));
@@ -188,7 +193,7 @@ inline namespace _v1
                             _tc = expr->_get_replacement()->as<typeclass_expression>();
                             assert(_tc);
 
-                            return _tc->get_typeclass()->type_for(ctx, _instance->get_arguments());
+                            return _tc->get_typeclass()->type_for(ctx, _instance->get_argument_values());
                         });
                 },
                 [&ctx](const imported_type & imported) -> future<typeclass_instance_type *> {

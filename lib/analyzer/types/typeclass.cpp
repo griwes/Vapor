@@ -62,7 +62,9 @@ inline namespace _v1
                         fmap(args,
                             [](auto && arg) {
                                 assert(arg->is_constant());
-                                return arg->_get_replacement();
+                                auto type_expr = arg->template as<type_expression>();
+                                assert(type_expr);
+                                return type_expr->get_value();
                             }))
                     .then([call_expr](
                               auto && tc_type) { call_expr->replace_with(make_type_expression(tc_type)); });

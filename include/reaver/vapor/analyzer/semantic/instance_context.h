@@ -40,7 +40,7 @@ inline namespace _v1
     struct instance_context
     {
         const typeclass * tc;
-        const std::vector<expression *> & arguments;
+        const std::vector<type *> & arguments;
 
         auto get_replacements() const
         {
@@ -49,20 +49,15 @@ inline namespace _v1
             auto && params = tc->get_parameter_expressions();
 
             assert(arguments.size() == params.size());
-            assert(
-                std::equal(arguments.begin(), arguments.end(), params.begin(), [](auto && lhs, auto && rhs) {
-                    return lhs->get_type() == rhs->get_type();
-                }));
 
             for (std::size_t i = 0; i < arguments.size(); ++i)
             {
-                repl.add_replacement(params[i], arguments[i]);
-                repl.add_replacement(params[i]->_get_replacement(), arguments[i]->_get_replacement());
+                repl.add_replacement(params[i], arguments[i]->get_expression());
+                repl.add_replacement(params[i]->_get_replacement(), arguments[i]->get_expression());
 
                 auto type_param = params[i]->as<type_expression>();
-                auto type_arg = arguments[i]->as<type_expression>();
-                assert(type_param && type_arg);
-                repl.add_replacement(type_param->get_value(), type_arg->get_value());
+                assert(type_param);
+                repl.add_replacement(type_param->get_value(), arguments[i]);
             }
 
             return repl;

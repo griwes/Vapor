@@ -40,7 +40,7 @@ inline namespace _v1
     public:
         friend class typeclass;
 
-        typeclass_instance_type(typeclass * tc, std::vector<expression *> arguments);
+        typeclass_instance_type(typeclass * tc, std::vector<type *> arguments);
 
         virtual std::string explain() const override;
         virtual void print(std::ostream & os, print_context ctx) const override;
@@ -73,7 +73,7 @@ inline namespace _v1
 
         std::unique_ptr<scope> _oset_scope = std::make_unique<scope>();
 
-        std::vector<expression *> _arguments;
+        std::vector<type *> _arguments;
         instance_context _ctx;
 
         std::map<std::u32string, overload_set *> _osets;

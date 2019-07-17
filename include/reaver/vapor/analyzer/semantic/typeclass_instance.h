@@ -49,6 +49,7 @@ inline namespace _v1
         typeclass_instance(ast_node parse, std::unique_ptr<scope> member_scope, imported_type type);
 
         std::vector<expression *> get_arguments() const;
+        std::vector<type *> get_argument_values() const;
         future<> simplify_arguments(analysis_context &);
 
         std::vector<function_definition *> get_member_function_defs() const;

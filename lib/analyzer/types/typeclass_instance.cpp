@@ -25,9 +25,11 @@
 #include <boost/algorithm/string.hpp>
 
 #include "vapor/analyzer/expressions/member.h"
+#include "vapor/analyzer/expressions/runtime_value.h"
 #include "vapor/analyzer/semantic/typeclass.h"
 #include "vapor/analyzer/semantic/typeclass_instance.h"
 #include "vapor/analyzer/statements/block.h"
+#include "vapor/analyzer/statements/default_instance.h"
 #include "vapor/analyzer/statements/function.h"
 
 #include "type_reference.pb.h"
@@ -36,7 +38,7 @@ namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
-    typeclass_instance_type::typeclass_instance_type(typeclass * tc, std::vector<expression *> arguments)
+    typeclass_instance_type::typeclass_instance_type(typeclass * tc, std::vector<type *> arguments)
         : _arguments{ std::move(arguments) }, _ctx{ tc, _arguments }
     {
         auto repl = _ctx.get_replacements();
@@ -131,7 +133,7 @@ inline namespace _v1
         type->set_allocated_typeclass(_ctx.tc->generate_interface_reference().release());
         for (auto && arg : _arguments)
         {
-            *type->add_arguments() = *arg->as<type_expression>()->get_value()->generate_interface_reference();
+            *type->add_arguments() = *arg->generate_interface_reference();
         }
 
         ret->set_allocated_typeclass_instance_type(type.release());
@@ -143,6 +145,8 @@ inline namespace _v1
     {
         // instance transformed function
         auto itf = make_function("default instance selector");
+        itf->set_parameters(fmap(inst->get_defined_instance()->get_argument_values(),
+            [&](type * arg) { return make_runtime_value(arg); }));
 
         assert(0);
     }
@@ -195,13 +199,8 @@ inline namespace _v1
             + boost::join(
                 fmap(_ctx.tc->get_scope()->codegen_ir(), [](auto && scope) { return scope.name; }), U".")
             + U"." + _ctx.tc->codegen_name(ctx) + U"("
-            + boost::join(fmap(_arguments,
-                              [&](expression * arg) {
-                                  auto type_expr = arg->as<type_expression>();
-                                  assert(type_expr);
-                                  return type_expr->get_value()->codegen_scopes(ctx).back().name;
-                              }),
-                ", ")
+            + boost::join(
+                fmap(_arguments, [&](type * arg) { return arg->codegen_scopes(ctx).back().name; }), ", ")
             + U")";
     }
 }

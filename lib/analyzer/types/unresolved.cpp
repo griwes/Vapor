@@ -175,8 +175,13 @@ inline namespace _v1
                             .then([&](expression * tc_expr) {
                                 auto tc = tc_expr->as<typeclass_expression>();
                                 return tc->get_typeclass()
-                                    ->type_for(
-                                        ctx, fmap(inst_type.arguments, [](auto && arg) { return arg.get(); }))
+                                    ->type_for(ctx,
+                                        fmap(inst_type.arguments,
+                                            [](auto && arg) {
+                                                auto type_expr = arg->template as<type_expression>();
+                                                assert(type_expr);
+                                                return type_expr->get_value();
+                                            }))
                                     .then([this](type * inst_type) { _resolved = inst_type; });
                             });
                     })));

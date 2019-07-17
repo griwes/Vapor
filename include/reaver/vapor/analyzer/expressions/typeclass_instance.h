@@ -55,6 +55,7 @@ inline namespace _v1
         virtual void mark_exported() override;
 
         future<typeclass_instance_type *> get_instance_type_future() const;
+        typeclass_instance * get_instance() const;
 
     private:
         virtual void _set_name(std::u32string name) override;

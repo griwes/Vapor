@@ -181,7 +181,7 @@ inline namespace _v1
     }
 
     future<typeclass_instance_type *> typeclass::type_for(analysis_context & ctx,
-        const std::vector<expression *> & arguments)
+        const std::vector<type *> & arguments)
     {
         auto & type_info = _instance_types[arguments];
         if (!type_info.instance)

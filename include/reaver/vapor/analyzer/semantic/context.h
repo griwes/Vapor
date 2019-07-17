@@ -34,22 +34,22 @@ inline namespace _v1
     class typeclass;
     class typeclass_type;
 
-    struct argument_list_hash
+    struct expression_list_hash
     {
         std::size_t operator()(const std::vector<expression *> & arg_list) const;
     };
 
-    struct argument_list_compare
+    struct expression_list_compare
     {
         bool operator()(const std::vector<expression *> & lhs, const std::vector<expression *> & rhs) const;
     };
 
-    struct parameter_type_list_hash
+    struct type_list_hash
     {
         std::size_t operator()(const std::vector<type *> & param_type_list) const;
     };
 
-    struct parameter_type_list_compare
+    struct type_list_compare
     {
         bool operator()(const std::vector<type *> & lhs, const std::vector<type *> & rhs) const;
     };
@@ -84,8 +84,8 @@ inline namespace _v1
         std::unordered_map<function_signature, std::shared_ptr<function_type>> _function_types;
         std::unordered_map<std::vector<type *>,
             std::shared_ptr<typeclass_type>,
-            parameter_type_list_hash,
-            parameter_type_list_compare>
+            type_list_hash,
+            type_list_compare>
             _typeclass_types;
         std::unordered_map<typeclass *, std::vector<std::shared_ptr<function>>> _typeclass_default_instances;
     };

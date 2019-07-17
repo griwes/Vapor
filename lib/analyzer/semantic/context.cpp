@@ -32,7 +32,7 @@ namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
-    std::size_t argument_list_hash::operator()(const std::vector<expression *> & arg_list) const
+    std::size_t expression_list_hash::operator()(const std::vector<expression *> & arg_list) const
     {
         std::size_t seed = 0;
 
@@ -45,7 +45,7 @@ inline namespace _v1
         return seed;
     }
 
-    bool argument_list_compare::operator()(const std::vector<expression *> & lhs,
+    bool expression_list_compare::operator()(const std::vector<expression *> & lhs,
         const std::vector<expression *> & rhs) const
     {
         return lhs.size() == rhs.size()
@@ -54,7 +54,7 @@ inline namespace _v1
                });
     }
 
-    std::size_t parameter_type_list_hash::operator()(const std::vector<type *> & arg_list) const
+    std::size_t type_list_hash::operator()(const std::vector<type *> & arg_list) const
     {
         std::size_t seed = 0;
 
@@ -67,8 +67,7 @@ inline namespace _v1
         return seed;
     }
 
-    bool parameter_type_list_compare::operator()(const std::vector<type *> & lhs,
-        const std::vector<type *> & rhs) const
+    bool type_list_compare::operator()(const std::vector<type *> & lhs, const std::vector<type *> & rhs) const
     {
         return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin());
     }

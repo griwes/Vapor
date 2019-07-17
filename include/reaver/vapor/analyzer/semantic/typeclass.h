@@ -80,8 +80,7 @@ inline namespace _v1
             return _scope.get();
         }
 
-        future<typeclass_instance_type *> type_for(analysis_context & ctx,
-            const std::vector<expression *> & args);
+        future<typeclass_instance_type *> type_for(analysis_context & ctx, const std::vector<type *> & args);
 
         void print(std::ostream & os, print_context ctx, bool print_members = false) const;
 
@@ -108,10 +107,7 @@ inline namespace _v1
             std::optional<future<typeclass_instance_type *>> analysis_future;
         };
 
-        std::unordered_map<std::vector<expression *>,
-            instance_information,
-            argument_list_hash,
-            argument_list_compare>
+        std::unordered_map<std::vector<type *>, instance_information, type_list_hash, type_list_compare>
             _instance_types;
     };
 }

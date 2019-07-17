@@ -56,6 +56,11 @@ inline namespace _v1
         assert(0);
     }
 
+    typeclass_instance * default_instance::get_defined_instance() const
+    {
+        return _instance->get_instance();
+    }
+
     future<> default_instance::_analyze(analysis_context & ctx)
     {
         auto instance_analysis = _instance->analyze(ctx);

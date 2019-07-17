@@ -29,6 +29,7 @@ namespace reaver::vapor::analyzer
 inline namespace _v1
 {
     class typeclass_instance_expression;
+    class typeclass_instance;
 
     class default_instance : public statement
     {
@@ -37,6 +38,8 @@ inline namespace _v1
         ~default_instance();
 
         virtual void print(std::ostream & os, print_context ctx) const override;
+
+        typeclass_instance * get_defined_instance() const;
 
     private:
         virtual future<> _analyze(analysis_context &) override;

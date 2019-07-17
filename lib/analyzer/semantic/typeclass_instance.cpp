@@ -82,6 +82,15 @@ inline namespace _v1
         return fmap(_arguments, [](auto && arg) { return arg.get(); });
     }
 
+    std::vector<type *> typeclass_instance::get_argument_values() const
+    {
+        return fmap(_arguments, [](auto && arg) {
+            auto type_expr = arg->template as<type_expression>();
+            assert(type_expr);
+            return type_expr->get_value();
+        });
+    }
+
     future<> typeclass_instance::simplify_arguments(analysis_context & ctx)
     {
         return when_all(fmap(_arguments, [&](auto && arg) {
