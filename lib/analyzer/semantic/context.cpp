@@ -22,7 +22,10 @@
 
 #include "vapor/analyzer/semantic/context.h"
 #include "vapor/analyzer/expressions/expression.h"
+#include "vapor/analyzer/expressions/runtime_value.h"
 #include "vapor/analyzer/semantic/symbol.h"
+#include "vapor/analyzer/semantic/typeclass_instance.h"
+#include "vapor/analyzer/statements/default_instance.h"
 #include "vapor/analyzer/statements/statement.h"
 #include "vapor/analyzer/types/function.h"
 #include "vapor/analyzer/types/sized_integer.h"
@@ -133,8 +136,15 @@ inline namespace _v1
         }
     }
 
-    void analysis_context::mark_default_instance_definition_processed()
+    void analysis_context::add_default_instance_definition(default_instance * inst)
     {
+        // instance transformed function
+        auto itf = make_function("default instance selector");
+        itf->set_parameters(fmap(inst->get_defined_instance()->get_argument_values(),
+            [&](type * arg) { return make_runtime_value(arg); }));
+
+        _typeclass_default_instances[inst->get_defined_instance()->get_typeclass()].push_back(std::move(itf));
+
         if (--_unprocessed_default_instance_definitions == 0)
         {
             _default_instances_promise.set();

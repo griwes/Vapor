@@ -65,11 +65,10 @@ inline namespace _v1
     {
         auto instance_analysis = _instance->analyze(ctx);
 
-        return _instance->get_instance_type_future().then(
-            [&, rest = std::move(instance_analysis)](auto instance_type) {
-                instance_type->add_default_instance_definition(ctx, this);
-                return rest;
-            });
+        return _instance->get_instance_type_future().then([&, rest = std::move(instance_analysis)](auto) {
+            ctx.add_default_instance_definition(this);
+            return rest;
+        });
     }
 
     std::unique_ptr<statement> default_instance::_clone(replacements & repl) const

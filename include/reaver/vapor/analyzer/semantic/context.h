@@ -33,6 +33,7 @@ inline namespace _v1
     class function_type;
     class typeclass;
     class typeclass_type;
+    class default_instance;
 
     struct expression_list_hash
     {
@@ -67,7 +68,7 @@ inline namespace _v1
 
         future<> default_instances_future() const;
         void set_default_instance_definition_count(std::size_t count);
-        void mark_default_instance_definition_processed();
+        void add_default_instance_definition(default_instance * inst);
 
         std::shared_ptr<cached_results> results;
         std::shared_ptr<simplification_context> simplification_ctx;
@@ -87,7 +88,8 @@ inline namespace _v1
             type_list_hash,
             type_list_compare>
             _typeclass_types;
-        std::unordered_map<typeclass *, std::vector<std::shared_ptr<function>>> _typeclass_default_instances;
+        std::unordered_map<const typeclass *, std::vector<std::shared_ptr<function>>>
+            _typeclass_default_instances;
     };
 }
 }

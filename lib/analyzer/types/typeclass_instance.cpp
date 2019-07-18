@@ -25,11 +25,9 @@
 #include <boost/algorithm/string.hpp>
 
 #include "vapor/analyzer/expressions/member.h"
-#include "vapor/analyzer/expressions/runtime_value.h"
 #include "vapor/analyzer/semantic/typeclass.h"
 #include "vapor/analyzer/semantic/typeclass_instance.h"
 #include "vapor/analyzer/statements/block.h"
-#include "vapor/analyzer/statements/default_instance.h"
 #include "vapor/analyzer/statements/function.h"
 
 #include "type_reference.pb.h"
@@ -138,17 +136,6 @@ inline namespace _v1
 
         ret->set_allocated_typeclass_instance_type(type.release());
         return ret;
-    }
-
-    void typeclass_instance_type::add_default_instance_definition(analysis_context & ctx,
-        default_instance * inst)
-    {
-        // instance transformed function
-        auto itf = make_function("default instance selector");
-        itf->set_parameters(fmap(inst->get_defined_instance()->get_argument_values(),
-            [&](type * arg) { return make_runtime_value(arg); }));
-
-        assert(0);
     }
 
     future<std::unique_ptr<expression>> typeclass_instance_type::get_default_instance_expr(
