@@ -33,7 +33,8 @@ inline namespace _v1
     {
     public:
         member_assignment_expression(std::u32string member_name)
-            : _type{ make_member_assignment_type(std::move(member_name), this) }
+            : expression{ nullptr, std::nullopt },
+              _type{ make_member_assignment_type(std::move(member_name), this) }
         {
             _set_type(_type.get());
         }

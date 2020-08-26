@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2018-2019 Michał "Griwes" Dominiak
+ * Copyright © 2018-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -41,18 +41,28 @@ namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
-    entity::entity(type * t, std::unique_ptr<expression> wrapped)
-        : expression{ t }, _wrapped{ std::move(wrapped) }
+    entity::entity(type * t, scope * lex_scope, std::u32string name, std::unique_ptr<expression> wrapped)
+        : expression{ t, lex_scope, std::move(name) }, _wrapped{ std::move(wrapped) }
     {
     }
 
-    entity::entity(std::unique_ptr<type> t, std::unique_ptr<expression> wrapped)
-        : expression{ t.get() }, _owned{ std::move(t) }, _wrapped{ std::move(wrapped) }
+    entity::entity(std::unique_ptr<type> t,
+        scope * lex_scope,
+        std::u32string name,
+        std::unique_ptr<expression> wrapped)
+        : expression{ t.get(), lex_scope, std::move(name) },
+          _owned{ std::move(t) },
+          _wrapped{ std::move(wrapped) }
     {
     }
 
-    entity::entity(std::shared_ptr<unresolved_type> res, std::unique_ptr<expression> wrapped)
-        : _unresolved{ std::move(res) }, _wrapped{ std::move(wrapped) }
+    entity::entity(std::shared_ptr<unresolved_type> res,
+        scope * lex_scope,
+        std::u32string name,
+        std::unique_ptr<expression> wrapped)
+        : expression{ lex_scope, std::move(name) },
+          _unresolved{ std::move(res) },
+          _wrapped{ std::move(wrapped) }
     {
         if (auto t = _unresolved.value()->get_resolved())
         {
@@ -119,7 +129,7 @@ inline namespace _v1
 
     declaration_ir entity::declaration_codegen_ir(ir_generation_context & ctx) const
     {
-        if (!has_entity_name() || get_type()->is_meta())
+        if (get_type()->is_meta())
         {
             return {};
         }
@@ -134,7 +144,8 @@ inline namespace _v1
                 static_cast<void>(_wrapped->constinit_ir(ctx));
             }
         }
-        return { codegen::ir::make_variable(get_type()->codegen_type(ctx), get_entity_name()) };
+        return { codegen::ir::make_variable(get_type()->codegen_type(ctx),
+            fmap(get_entity_name(), [](auto && sv) { return std::u32string{ sv }; })) };
     }
 
     std::vector<codegen::ir::entity> entity::module_codegen_ir(ir_generation_context & ctx) const
@@ -142,7 +153,7 @@ inline namespace _v1
         assert(_owned);
         assert(dynamic_cast<module_type *>(_owned.value().get()));
 
-        auto scopes = _owned.value()->get_scope()->codegen_ir();
+        std::u32string own_scope{ _owned.value()->get_scope()->get_scoped_name() };
 
         auto mod = mbind(_owned.value()->get_scope()->symbols_in_order(), [&](auto && symbol) {
             return fmap(symbol->codegen_ir(ctx), [&](auto && decl) {
@@ -151,15 +162,9 @@ inline namespace _v1
                         [&](std::shared_ptr<codegen::ir::variable> symb) {
                             symb->imported = !_is_local;
                             symb->declared = !_is_local;
-                            symb->scopes = scopes;
-                            symb->name = symbol->get_name();
                             return symb;
                         },
-                        [&](auto && symb) {
-                            symb.scopes = scopes;
-                            symb.name = symbol->get_name();
-                            return symb;
-                        }));
+                        [&](auto && symb) { return symb; }));
             });
         });
 
@@ -179,7 +184,8 @@ inline namespace _v1
                 break;
 
             case proto::entity::kOverloadSet:
-                expr = make_unresolved_overload_set_expression(ctx, &ent.type().user_defined());
+                expr = make_unresolved_overload_set_expression(
+                    ctx, &ent.type().user_defined(), ctx.current_lex_scope);
                 break;
 
             case proto::entity::kTypeclass:
@@ -187,16 +193,14 @@ inline namespace _v1
                 auto tc = import_typeclass(ctx, ent.typeclass());
                 expr = std::make_unique<typeclass_expression>(
                     imported_ast_node(ctx, ent.range()), std::move(tc));
-                expr->set_name(utf32(ctx.current_symbol));
                 break;
             }
 
             case proto::entity::kTypeclassInstance:
             {
-                auto inst = import_typeclass_instance(ctx, type, ent.typeclass_instance());
+                auto inst = import_typeclass_instance(ctx, type, ent.typeclass_instance(), false);
                 expr = std::make_unique<typeclass_instance_expression>(
                     imported_ast_node(ctx, ent.range()), std::move(inst));
-                expr->set_name(utf32(ctx.current_symbol));
                 break;
             }
 
@@ -207,8 +211,10 @@ inline namespace _v1
                                                  << ctx.module_path_stack.back().module_file_path;
         }
 
-        return std::get<0>(fmap(
-            type, [&](auto && type) { return std::make_unique<entity>(std::move(type), std::move(expr)); }));
+        return std::get<0>(fmap(type, [&](auto && type) {
+            return std::make_unique<entity>(
+                std::move(type), ctx.current_lex_scope, utf32(ctx.current_symbol), std::move(expr));
+        }));
     }
 }
 }

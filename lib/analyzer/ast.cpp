@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2018-2019 Michał "Griwes" Dominiak
+ * Copyright © 2018-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -45,7 +45,7 @@ inline namespace _v1
         try
         {
             _imports = fmap(_original_ast.global_imports, [this](auto && im) {
-                return preanalyze_import(_ctx, im, _global_scope.get(), import_mode::statement);
+                return preanalyze_import(_ctx, im, _global_scope.get(), std::nullopt, import_mode::statement);
             });
             _modules = fmap(_original_ast.module_definitions,
                 [this](auto && m) { return preanalyze_module(_ctx, m, _global_scope.get()); });
@@ -73,6 +73,8 @@ inline namespace _v1
         auto futures = fmap(_modules, [this](auto && m) { return m->analyze(_proper); });
         futures.emplace_back(when_all(fmap(_global_scope->symbols_in_order(),
             [&](auto && symb) { return symb->get_expression()->analyze(_proper); })));
+        futures.emplace_back(when_all(fmap(
+            _ctx.imported_default_instances, [&](auto && definst) { return definst->analyze(_proper); })));
         get(when_all(futures));
     }
 
@@ -99,6 +101,12 @@ inline namespace _v1
         {
             auto symbols = value->module_codegen_ir(ctx);
             std::move(symbols.begin(), symbols.end(), std::back_inserter(entities));
+        }
+
+        for (auto && def_inst : _ctx.imported_default_instances)
+        {
+            auto decls = def_inst->declaration_codegen_ir(ctx);
+            std::move(decls.begin(), decls.end(), std::back_inserter(entities));
         }
 
         while (auto fn = ctx.function_to_generate())

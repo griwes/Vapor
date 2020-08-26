@@ -1,0 +1,26 @@
+// IGNORE: true
+
+module export_default
+{
+    export let tc = typeclass (t : type) {
+        function with_default(arg : t) -> t {
+            return arg;
+        }
+
+        function without_default(arg : t) -> t;
+    };
+
+    let int32 = sized_int(32);
+
+    default instance tc(int32) {
+        function with_default(arg) {
+            return arg - 3;
+        }
+
+        function without_default(arg) {
+            return arg * 2;
+        }
+    };
+}
+
+// vim: filetype=cpp

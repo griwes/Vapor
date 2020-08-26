@@ -39,7 +39,7 @@ inline namespace _v1
         scope * lex_scope,
         bool is_top_level)
     {
-        auto scope = lex_scope->clone_local();
+        auto scope = lex_scope->clone_for_local();
 
         auto statements = fmap(parse.block_value, [&](auto && row) {
             return std::get<0>(fmap(row,

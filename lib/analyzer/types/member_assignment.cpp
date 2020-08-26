@@ -49,16 +49,14 @@ inline namespace _v1
         {
             auto overload = make_function("member assignment");
             overload->set_return_type(assigned_type()->get_expression());
-            overload->set_parameters([&] {
-                std::vector<std::unique_ptr<expression>> ret;
-                ret.push_back(make_expression_ref(_expr, _expr->get_ast_info()));
-                ret.push_back(make_runtime_value(builtin_types().unconstrained.get()));
-                return ret;
-            }());
+            overload->set_parameters(
+                unique_expr_list(make_expression_ref(_expr, nullptr, std::nullopt, _expr->get_ast_info()),
+                    make_runtime_value(builtin_types().unconstrained, nullptr, std::nullopt)));
             overload->add_analysis_hook([this](auto &&, auto && call_expr, std::vector<expression *> args) {
                 assert(args.size() == 2);
                 _expr->set_rhs(args.back());
-                call_expr->replace_with(make_expression_ref(_expr, call_expr->get_ast_info()));
+                call_expr->replace_with(make_expression_ref(
+                    _expr, call_expr->get_scope(), call_expr->get_name(), call_expr->get_ast_info()));
 
                 return make_ready_future();
             });

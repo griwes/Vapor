@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2018-2019 Michał "Griwes" Dominiak
+ * Copyright © 2018-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -29,9 +29,9 @@
 #include "vapor/analyzer/expressions/import.h"
 #include "vapor/analyzer/precontext.h"
 #include "vapor/analyzer/semantic/symbol.h"
+#include "vapor/analyzer/statements/default_instance.h"
 #include "vapor/analyzer/types/module.h"
 #include "vapor/analyzer/types/unresolved.h"
-#include "vapor/codegen/ir/scope.h"
 #include "vapor/parser/import_expression.h"
 #include "vapor/sha.h"
 
@@ -225,16 +225,15 @@ inline namespace _v1
                     continue;
                 }
 
-                auto scope = lex_scope->clone_for_class();
-                scope->set_name(utf32(name_part), codegen::ir::scope_type::module);
-
+                auto scope = lex_scope->clone_for_module(utf32(name_part));
                 auto old_scope = std::exchange(lex_scope, scope.get());
 
                 auto type_uptr = std::make_unique<module_type>(std::move(scope), name_part);
                 type = type_uptr.get();
 
-                saved = make_entity(std::move(type_uptr));
-                auto symbol = make_symbol(utf32(name_part), saved.get());
+                auto name = utf32(name_part);
+                saved = make_entity(std::move(type_uptr), old_scope, name);
+                auto symbol = make_symbol(std::move(name), saved.get());
                 symbol->hide();
                 saved->save_symbol(symbol.get());
                 assert(old_scope->init(utf32(name_part), std::move(symbol)));
@@ -266,12 +265,16 @@ inline namespace _v1
             {
                 ctx.current_symbol = *imported_entity.first;
                 auto ent = get_entity(ctx, *imported_entity.second);
-                ent->set_name(utf32(*imported_entity.first));
                 type->add_symbol(
                     *imported_entity.first, ent.get(), imported_entity.second->is_name_exported());
 
-                ctx.imported_entities.emplace(
-                    synthesized_udr{ ctx.module_stack.back(), ctx.current_symbol }, std::move(ent));
+                ctx.imported_entities.emplace(synthesized_udr{ ctx.current_symbol }, std::move(ent));
+            }
+
+            for (auto && default_instance : module.default_instances())
+            {
+                auto defn = import_default_instance(ctx, default_instance);
+                ctx.imported_default_instances.push_back(std::move(defn));
             }
 
             ctx.module_stack.pop_back();
@@ -324,6 +327,7 @@ inline namespace _v1
     std::unique_ptr<import_expression> preanalyze_import(precontext & ctx,
         const parser::import_expression & parse,
         scope * lex_scope,
+        std::optional<std::u32string> name,
         import_mode mode)
     {
         auto expr = std::get<0>(fmap(parse.module_name,
@@ -340,7 +344,8 @@ inline namespace _v1
                         ent->get_symbol()->unhide();
                     }
 
-                    return std::make_unique<import_expression>(make_node(parse), ent);
+                    return std::make_unique<import_expression>(
+                        make_node(parse), ent, lex_scope, std::move(name));
                 },
                 [&](auto && expr) -> std::unique_ptr<import_expression> { assert(0); })));
 
@@ -363,7 +368,7 @@ inline namespace _v1
 
     std::unique_ptr<expression> import_expression::_clone_expr(replacements &) const
     {
-        return std::make_unique<import_expression>(get_ast_info().value(), _module);
+        return std::make_unique<import_expression>(get_ast_info().value(), _module, get_scope(), get_name());
     }
 
     future<expression *> import_expression::_simplify_expr(recursive_context ctx)

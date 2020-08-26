@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2019 Michał "Griwes" Dominiak
+ * Copyright © 2019-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -40,9 +40,12 @@ inline namespace _v1
         virtual void print(std::ostream & os, print_context ctx) const override;
 
         typeclass_instance * get_defined_instance() const;
+        typeclass_instance_expression * get_defined_instance_expr() const;
+        virtual declaration_ir declaration_codegen_ir(ir_generation_context &) const override;
 
     private:
         virtual future<> _analyze(analysis_context &) override;
+        virtual future<statement *> _simplify(recursive_context) override;
         virtual std::unique_ptr<statement> _clone(replacements & repl) const override;
         virtual statement_ir _codegen_ir(ir_generation_context & ctx) const override;
 
@@ -59,6 +62,11 @@ inline namespace _v1
 }
 }
 
+namespace reaver::vapor::proto
+{
+class entity;
+}
+
 namespace reaver::vapor::analyzer
 {
 inline namespace _v1
@@ -66,5 +74,6 @@ inline namespace _v1
     std::unique_ptr<default_instance> preanalyze_default_instance(precontext & ctx,
         const parser::default_instance_definition & parse,
         scope * lex_scope);
+    std::unique_ptr<default_instance> import_default_instance(precontext & ctx, const proto::entity & entity);
 }
 }

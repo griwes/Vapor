@@ -33,22 +33,30 @@ inline namespace _v1
     class member_access_expression : public expression
     {
     public:
-        member_access_expression(ast_node parse, std::u32string name) : _name{ std::move(name) }
+        member_access_expression(ast_node parse,
+            scope * lex_scope,
+            std::optional<std::u32string> name,
+            std::u32string referenced_name)
+            : expression{ lex_scope, std::move(name) }, _referenced_name{ std::move(referenced_name) }
         {
             _set_ast_info(parse);
         }
 
-        member_access_expression(std::u32string name, type * referenced_type)
-            : expression{ referenced_type }, _name{ std::move(name) }
+        member_access_expression(scope * lex_scope,
+            std::optional<std::u32string> name,
+            std::u32string referenced_name,
+            type * referenced_type)
+            : expression{ referenced_type, lex_scope, std::move(name) },
+              _referenced_name{ std::move(referenced_name) }
         {
             assert(referenced_type);
         }
 
         virtual void print(std::ostream & os, print_context) const override;
 
-        auto get_name() const
+        auto get_referenced_name() const
         {
-            return _name;
+            return _referenced_name;
         }
 
         virtual bool is_member_access() const override
@@ -64,7 +72,11 @@ inline namespace _v1
         void set_base_expression(expression * base);
 
     private:
-        member_access_expression(ast_node parse, expression * referenced) : _referenced{ referenced }
+        member_access_expression(ast_node parse,
+            scope * lex_scope,
+            std::optional<std::u32string> name,
+            expression * referenced)
+            : expression{ lex_scope, name }, _referenced{ referenced }
         {
             _set_ast_info(parse);
         }
@@ -75,28 +87,29 @@ inline namespace _v1
         {
             if (_referenced)
             {
-                return make_expression_ref(repl.get_replacement(_referenced), get_ast_info());
+                return make_expression_ref(
+                    repl.get_replacement(_referenced), get_scope(), get_name(), get_ast_info());
             }
 
             if (!_base)
             {
                 return std::unique_ptr<member_access_expression>{ new member_access_expression{
-                    _name, get_type() } };
+                    get_scope(), get_name(), _referenced_name, get_type() } };
             }
 
             auto replaced_base = repl.get_replacement(_base);
-            if (auto repl = replaced_base->get_member(_name))
+            if (auto repl = replaced_base->get_member(_referenced_name))
             {
-                return make_expression_ref(repl, get_ast_info());
+                return make_expression_ref(repl, get_scope(), get_name(), get_ast_info());
             }
 
             assert(!_assignment_expr);
 
             std::unique_ptr<member_access_expression> ret{ new member_access_expression{
-                get_ast_info().value(), nullptr } };
+                get_ast_info().value(), get_scope(), get_name(), nullptr } };
             ret->_base = replaced_base;
             ret->_set_type(get_type());
-            ret->_name = _name;
+            ret->_referenced_name = _referenced_name;
             return ret;
         }
 
@@ -118,7 +131,7 @@ inline namespace _v1
             assert(0);
         }
 
-        std::u32string _name;
+        std::u32string _referenced_name;
 
         expression * _referenced = nullptr;
         mutable const expression * _base = nullptr;
@@ -144,12 +157,17 @@ inline namespace _v1
 
     std::unique_ptr<member_access_expression> preanalyze_member_access_expression(precontext & ctx,
         const parser::member_expression & parse,
-        scope *);
+        scope *,
+        std::optional<std::u32string> name);
 
-    inline std::unique_ptr<member_access_expression> make_member_access_expression(std::u32string name,
-        type * ref_type)
+    inline std::unique_ptr<member_access_expression> make_member_access_expression(
+        std::u32string referenced_name,
+        type * ref_type,
+        scope * lex_scope,
+        std::optional<std::u32string> name = std::nullopt)
     {
-        return std::make_unique<member_access_expression>(std::move(name), ref_type);
+        return std::make_unique<member_access_expression>(
+            lex_scope, std::move(name), std::move(referenced_name), ref_type);
     }
 }
 }

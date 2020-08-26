@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2014, 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2014, 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -30,7 +30,6 @@
 #include <reaver/exception.h>
 #include <reaver/optional.h>
 
-#include "../../codegen/ir/scope.h"
 #include "../../utf.h"
 #include "../ir_context.h"
 
@@ -51,6 +50,14 @@ inline namespace _v1
 
     class symbol;
 
+    enum class scope_kind
+    {
+        global,
+        module,
+        type,
+        local
+    };
+
     class scope
     {
         struct _key
@@ -58,23 +65,17 @@ inline namespace _v1
         };
 
     public:
-        scope(bool is_local = false) : _is_local_scope{ is_local }
+        scope(scope_kind kind = scope_kind::global) : _scope_kind{ kind }
         {
         }
 
     public:
         scope(_key,
             scope * parent_scope,
-            bool is_local,
+            scope_kind kind,
             bool is_shadowing_boundary,
-            const scope * other = nullptr)
-            : _parent{ parent_scope },
-              _global{ _parent ? _parent->_global : nullptr },
-              _is_local_scope{ is_local },
-              _is_shadowing_boundary{ is_shadowing_boundary }
-        {
-        }
-
+            bool is_special = false,
+            const scope * other = nullptr);
         ~scope();
 
         void close();
@@ -84,30 +85,17 @@ inline namespace _v1
             return _parent;
         }
 
-        scope * clone_for_decl()
-        {
-            if (_is_local_scope)
-            {
-                return new scope{ _key{}, this, _is_local_scope, false };
-            }
-
-            return this;
-        }
-
-        std::unique_ptr<scope> clone_local()
-        {
-            return std::make_unique<scope>(_key{}, this, true, true);
-        }
-
-        std::unique_ptr<scope> clone_for_class()
-        {
-            return std::make_unique<scope>(_key{}, this, false, true);
-        }
+        std::unique_ptr<scope> clone_for_module(std::u32string name);
+        std::unique_ptr<scope> clone_for_type(std::u32string name);
+        std::unique_ptr<scope> _clone_for_default_instance();
+        std::unique_ptr<scope> clone_for_local();
+        scope * clone_for_decl();
 
         symbol * get(const std::u32string & name) const;
         std::optional<symbol *> try_get(const std::u32string & name) const;
 
         symbol * init(const std::u32string & name, std::unique_ptr<symbol> symb);
+        symbol * init_unnamed(std::unique_ptr<symbol> symb);
 
         template<typename F>
         auto get_or_init(const std::u32string & name, F init)
@@ -125,33 +113,57 @@ inline namespace _v1
         }
 
         symbol * resolve(const std::u32string & name) const;
+        std::vector<symbol *> declared_symbols() const;
 
-        const auto & declared_symbols() const
-        {
-            assert(_is_closed);
-            return _symbols;
-        }
-
-        void set_name(std::u32string name, codegen::ir::scope_type type)
+        void set_name(std::u32string name)
         {
             assert(_name.empty());
             _name = std::move(name);
-            _scope_type = type;
         }
 
-        std::vector<codegen::ir::scope> codegen_ir() const
+        std::u32string_view get_name() const
         {
-            std::vector<codegen::ir::scope> scopes;
-            if (_parent)
+            assert(!_name.empty());
+            return _name;
+        }
+
+        scope_kind get_kind() const
+        {
+            return _scope_kind;
+        }
+
+        std::u32string_view get_scoped_name() const
+        {
+            if (!_full_name)
             {
-                scopes = _parent->codegen_ir();
+                if (_is_special)
+                {
+                    _full_name = _name + U".";
+                }
+
+                else if (!_name.empty())
+                {
+                    _full_name = std::u32string{ _parent ? _parent->get_scoped_name() : U"" } + _name + U".";
+                }
+
+                else
+                {
+                    _full_name = U"";
+                }
             }
 
-            if (!_name.empty())
+            return _full_name.value();
+        }
+
+        std::u32string get_entity_name() const
+        {
+            if (_is_special)
             {
-                scopes.emplace_back(_name, _scope_type);
+                return _name;
             }
-            return scopes;
+
+            return !_name.empty() ? std::u32string{ _parent ? _parent->get_scoped_name() : U"" } + _name
+                                  : U"";
         }
 
         const auto & symbols_in_order() const
@@ -174,17 +186,19 @@ inline namespace _v1
 
     private:
         std::u32string _name;
-        codegen::ir::scope_type _scope_type;
+        mutable std::optional<std::u32string> _full_name;
 
         scope * _parent = nullptr;
         scope * _global = nullptr;
         std::unordered_set<std::unique_ptr<scope>> _keepalive;
         std::unordered_map<std::u32string, std::unique_ptr<symbol>> _symbols;
+        std::vector<std::unique_ptr<symbol>> _unnamed_symbols;
         std::vector<symbol *> _symbols_in_order;
         mutable std::unordered_map<std::u32string, symbol *> _resolve_cache;
-        const bool _is_local_scope = false;
+        const scope_kind _scope_kind = scope_kind::global;
         const bool _is_shadowing_boundary = false;
         bool _is_closed = false;
+        bool _is_special = false;
     };
 
     void initialize_global_scope(scope * lex_scope, std::vector<std::shared_ptr<void>> & keepalive_list);

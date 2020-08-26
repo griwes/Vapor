@@ -32,7 +32,10 @@ inline namespace _v1
     class unresolved_type_expression : public expression
     {
     public:
-        unresolved_type_expression(std::shared_ptr<unresolved_type> type) : _type{ std::move(type) }
+        unresolved_type_expression(std::shared_ptr<unresolved_type> type,
+            scope * lex_scope,
+            std::optional<std::u32string> name)
+            : expression{ lex_scope, std::move(name) }, _type{ std::move(type) }
         {
         }
 

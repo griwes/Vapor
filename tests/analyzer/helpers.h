@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2019 Michał "Griwes" Dominiak
+ * Copyright © 2017-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -52,7 +52,7 @@ inline namespace _v1
     class test_expression : public expression
     {
     public:
-        test_expression(type * t = nullptr) : expression{ t }
+        test_expression(type * t = nullptr) : expression{ t, nullptr, std::nullopt }
         {
         }
 
@@ -162,14 +162,13 @@ inline namespace _v1
             assert(0);
         }
 
-    private:
-        virtual void _codegen_type(ir_generation_context &,
-            std::shared_ptr<codegen::ir::user_type>) const override
+        virtual std::u32string codegen_name() const override
         {
             throw unexpected_call{ __PRETTY_FUNCTION__ };
         }
 
-        virtual std::u32string _codegen_name(ir_generation_context &) const override
+    private:
+        virtual void _codegen_type(ir_generation_context &) const override
         {
             throw unexpected_call{ __PRETTY_FUNCTION__ };
         }

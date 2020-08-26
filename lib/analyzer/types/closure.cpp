@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -35,16 +35,12 @@ inline namespace _v1
         return make_ready_future(std::vector<function *>{ _function.get() });
     }
 
-    void closure_type::_codegen_type(ir_generation_context & ctx,
+    void closure_type::_codegen_user_type(ir_generation_context & ctx,
         std::shared_ptr<codegen::ir::user_type> actual_type) const
     {
-        auto type = codegen::ir::user_type{ _codegen_name(ctx), get_scope()->codegen_ir(), 0, {} };
-
-        auto scopes = get_scope()->codegen_ir();
-        scopes.emplace_back(type.name, codegen::ir::scope_type::type);
+        auto type = codegen::ir::user_type{ get_scope()->get_entity_name() };
 
         auto fn = _function->codegen_ir(ctx);
-        fn.scopes = scopes;
         fn.parent_type = actual_type;
         type.members = { codegen::ir::member{ fn } };
 

@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -21,8 +21,12 @@
  **/
 
 #include "vapor/analyzer/semantic/context.h"
+#include "vapor/analyzer/expressions/call.h"
 #include "vapor/analyzer/expressions/expression.h"
+#include "vapor/analyzer/expressions/expression_ref.h"
 #include "vapor/analyzer/expressions/runtime_value.h"
+#include "vapor/analyzer/expressions/typeclass_instance.h"
+#include "vapor/analyzer/semantic/overloads.h"
 #include "vapor/analyzer/semantic/symbol.h"
 #include "vapor/analyzer/semantic/typeclass_instance.h"
 #include "vapor/analyzer/statements/default_instance.h"
@@ -30,6 +34,7 @@
 #include "vapor/analyzer/types/function.h"
 #include "vapor/analyzer/types/sized_integer.h"
 #include "vapor/analyzer/types/typeclass.h"
+#include "vapor/analyzer/types/typeclass_instance.h"
 
 namespace reaver::vapor::analyzer
 {
@@ -141,7 +146,15 @@ inline namespace _v1
         // instance transformed function
         auto itf = make_function("default instance selector");
         itf->set_parameters(fmap(inst->get_defined_instance()->get_argument_values(),
-            [&](type * arg) { return make_runtime_value(arg); }));
+            [&](type * arg) { return make_runtime_value(arg, nullptr, std::nullopt); }));
+        itf->add_analysis_hook(
+            [inst](analysis_context & ctx, call_expression * call, std::vector<expression *> args) {
+                call->replace_with(make_expression_ref(inst->get_defined_instance_expr(),
+                    call->get_scope(),
+                    call->get_name(),
+                    call->get_ast_info()));
+                return make_ready_future();
+            });
 
         _typeclass_default_instances[inst->get_defined_instance()->get_typeclass()].push_back(std::move(itf));
 
@@ -149,6 +162,29 @@ inline namespace _v1
         {
             _default_instances_promise.set();
         }
+    }
+
+    future<std::unique_ptr<expression>> analysis_context::resolve_default_instance(const range_type & range,
+        scope * lex_scope,
+        std::optional<std::u32string> name,
+        typeclass_instance_type * inst)
+    {
+        auto invented_arguments = fmap(
+            inst->get_arguments(), [](auto type) { return make_runtime_value(type, nullptr, std::nullopt); });
+        auto invented_arguments_raw = fmap(invented_arguments, [](auto && expr) { return expr.get(); });
+        return select_overload(*this,
+            range,
+            lex_scope,
+            std::move(name),
+            invented_arguments_raw,
+            fmap(_typeclass_default_instances.at(inst->get_typeclass()), [](auto && fn) { return fn.get(); }))
+            .then([_ = std::move(invented_arguments), &ctx = *this](auto && expr) {
+                auto ret = expr->analyze(ctx);
+                return ret.then([expr = std::move(expr)]() mutable {
+                    assert(expr->template as<typeclass_instance_expression>());
+                    return std::move(expr);
+                });
+            });
     }
 }
 }

@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2019 Michał "Griwes" Dominiak
+ * Copyright © 2019-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -46,6 +46,16 @@ inline namespace _v1
 
         virtual overload_set_type * get_type() const = 0;
 
+        virtual scope * get_scope() const
+        {
+            return get_type()->get_scope();
+        }
+
+        virtual std::u32string get_name() const
+        {
+            return get_scope()->get_entity_name();
+        }
+
     protected:
         std::vector<function *> _functions;
         // shared so that this is destructible without knowing the definition
@@ -55,7 +65,7 @@ inline namespace _v1
     class overload_set final : public overload_set_base
     {
     public:
-        overload_set(scope *);
+        overload_set(std::unique_ptr<scope> lex_scope);
         ~overload_set() = default;
 
         virtual std::vector<function *> get_overloads() const override;
@@ -70,10 +80,15 @@ inline namespace _v1
     class refined_overload_set final : public overload_set_base
     {
     public:
-        refined_overload_set(overload_set * base);
+        refined_overload_set(scope * lex_scope, overload_set * base);
 
         virtual std::vector<function *> get_overloads() const override;
         virtual overload_set_type * get_type() const override;
+
+        virtual scope * get_scope() const override
+        {
+            return _refined_scope.get();
+        }
 
         overload_set * get_base() const
         {
@@ -88,6 +103,7 @@ inline namespace _v1
 
     private:
         overload_set * _base;
+        std::unique_ptr<scope> _refined_scope;
 
         std::unordered_map<std::size_t, function *> _vtable_entries;
     };

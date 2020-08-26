@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2017 Michał "Griwes" Dominiak
+ * Copyright © 2016-2017, 2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -85,16 +85,6 @@ inline namespace _v1
         {
             auto && futs = _get_futures<T>();
 
-            {
-                _shlock lock{ _futures_lock };
-                auto it = futs.find(ptr);
-                if (it != futs.end())
-                {
-                    return it->second;
-                }
-            }
-
-            _ulock lock{ _futures_lock };
             auto it = futs.find(ptr);
             if (it != futs.end())
             {
@@ -124,16 +114,14 @@ inline namespace _v1
         cached_results & results;
 
     private:
-        std::atomic<bool> _something_happened{ false };
+        bool _something_happened{ false };
 
         using _ulock = std::unique_lock<std::shared_mutex>;
         using _shlock = std::shared_lock<std::shared_mutex>;
 
-        mutable std::shared_mutex _futures_lock;
         std::unordered_map<statement *, future<statement *>> _statement_futures;
         std::unordered_map<expression *, future<expression *>> _expression_futures;
 
-        std::mutex _keep_alive_lock;
         std::unordered_set<std::unique_ptr<statement>> _keep_alive_stmt;
 
         template<typename T>

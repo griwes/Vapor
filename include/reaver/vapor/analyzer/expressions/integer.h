@@ -36,8 +36,11 @@ inline namespace _v1
     class integer_constant : public constant
     {
     public:
-        integer_constant(boost::multiprecision::cpp_int value, ast_node parse = {})
-            : constant{ builtin_types().integer.get() }, _value{ std::move(value) }
+        integer_constant(boost::multiprecision::cpp_int value,
+            scope * lex_scope,
+            std::optional<std::u32string> name,
+            ast_node parse = {})
+            : constant{ builtin_types().integer, lex_scope, std::move(name) }, _value{ std::move(value) }
         {
             _set_ast_info(parse);
         }
@@ -64,7 +67,8 @@ inline namespace _v1
 
         virtual std::unique_ptr<expression> _clone_expr(replacements & repl) const override
         {
-            return std::make_unique<integer_constant>(_value, get_ast_info().value());
+            return std::make_unique<integer_constant>(
+                _value, get_scope(), get_name(), get_ast_info().value());
         }
 
         virtual future<expression *> _simplify_expr(recursive_context) override
@@ -88,10 +92,14 @@ inline namespace _v1
         boost::multiprecision::cpp_int _value;
     };
 
-    inline std::unique_ptr<integer_constant> make_integer_constant(const parser::integer_literal & parse)
+    inline std::unique_ptr<integer_constant> make_integer_constant(const parser::integer_literal & parse,
+        scope * lex_scope,
+        std::optional<std::u32string> name = std::nullopt)
     {
-        return std::make_unique<integer_constant>(
-            boost::multiprecision::cpp_int{ utf8(parse.value.string) }, make_node(parse));
+        return std::make_unique<integer_constant>(boost::multiprecision::cpp_int{ utf8(parse.value.string) },
+            lex_scope,
+            std::move(name),
+            make_node(parse));
     }
 }
 }

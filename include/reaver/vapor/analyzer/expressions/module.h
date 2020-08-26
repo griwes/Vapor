@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2014, 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2014, 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -52,6 +52,8 @@ inline namespace _v1
     {
     public:
         module(ast_node parse,
+            scope * lex_scope,
+            std::u32string canonical_name,
             std::vector<std::u32string> name,
             module_type * typr,
             std::vector<std::unique_ptr<statement>> stmts);
@@ -73,7 +75,10 @@ inline namespace _v1
             return simplify(ctx).then([](auto &&) {});
         }
 
-        virtual declaration_ir declaration_codegen_ir(ir_generation_context &) const override;
+        virtual declaration_ir declaration_codegen_ir(ir_generation_context &) const override
+        {
+            return {};
+        }
 
         void generate_interface(proto::module &) const;
 

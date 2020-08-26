@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -49,10 +49,8 @@ inline namespace _v1
         reaver::unique_function<statement_ir(ir_generation_context &, std::vector<codegen::ir::value>) const>;
     using function_hook = reaver::unique_function<
         reaver::future<>(analysis_context &, call_expression *, std::vector<expression *>)>;
-    using function_eval =
-        reaver::unique_function<future<expression *>(recursive_context, std::vector<expression *>)>;
-    using scopes_generator =
-        reaver::unique_function<std::vector<codegen::ir::scope>(ir_generation_context &) const>;
+    using function_eval = reaver::unique_function<
+        future<expression *>(recursive_context, call_expression *, std::vector<expression *>)>;
 
     class function
     {
@@ -89,7 +87,7 @@ inline namespace _v1
         std::string explain() const;
         void print(std::ostream & os, print_context ctx, bool print_signature = false) const;
 
-        future<expression *> simplify(recursive_context, std::vector<expression *>);
+        future<expression *> simplify(recursive_context, call_expression *, std::vector<expression *>);
 
         void mark_as_entry(analysis_context & ctx, expression * entry_expr)
         {
@@ -214,11 +212,6 @@ inline namespace _v1
             _is_exported = true;
         }
 
-        void set_scopes_generator(scopes_generator generator)
-        {
-            _scopes_generator = std::move(generator);
-        }
-
         auto & get_range() const
         {
             return _range;
@@ -248,7 +241,6 @@ inline namespace _v1
 
         std::vector<function_hook> _analysis_hooks;
         std::optional<function_eval> _compile_time_eval;
-        std::optional<scopes_generator> _scopes_generator;
 
         bool _entry = false;
         expression * _entry_expr = nullptr;

@@ -34,8 +34,11 @@ inline namespace _v1
     class function_expression : public expression
     {
     public:
-        function_expression(function * fun, function_type * type)
-            : expression{ type }, _fun{ fun }, _type{ type }
+        function_expression(function * fun,
+            function_type * type,
+            scope * lex_scope,
+            std::optional<std::u32string> name)
+            : expression{ type, lex_scope, std::move(name) }, _fun{ fun }, _type{ type }
         {
         }
 
@@ -63,16 +66,20 @@ inline namespace _v1
             }
 
             return _fun->get_return_type().then([=, &ctx](auto && return_type_expr) {
-                auto param_types = fmap(_fun->parameters(), [](auto && var) {
-                    assert(var->get_type() == builtin_types().type.get() && var->is_constant());
-                    auto type_var = static_cast<type_expression *>(var);
-                    return type_var->get_value();
-                });
+                assert(return_type_expr->get_type() == builtin_types().type);
 
-                assert(return_type_expr->get_type() == builtin_types().type.get()
-                    && return_type_expr->is_constant());
-                auto return_type_type_expr = return_type_expr->template as<type_expression>();
-                auto return_type = return_type_type_expr->get_value();
+                auto return_type = [&] {
+                    if (return_type_expr->is_constant())
+                    {
+                        auto return_type_type_expr = return_type_expr->template as<type_expression>();
+                        assert(return_type_type_expr);
+                        return return_type_type_expr->get_value();
+                    }
+
+                    return builtin_types().unconstrained;
+                }();
+
+                auto param_types = fmap(_fun->parameters(), [](auto && expr) { return expr->get_type(); });
 
                 _set_type(ctx.get_function_type({ std::move(param_types), return_type }));
             });
@@ -80,7 +87,7 @@ inline namespace _v1
 
         virtual std::unique_ptr<expression> _clone_expr(replacements & repl) const override
         {
-            return std::unique_ptr<expression>(new function_expression(_fun, _type));
+            return std::unique_ptr<expression>(new function_expression(_fun, _type, get_scope(), get_name()));
         }
 
         virtual statement_ir _codegen_ir(ir_generation_context & ctx) const override
@@ -102,9 +109,12 @@ inline namespace _v1
         function_type * _type;
     };
 
-    inline auto make_function_expression(function * fun, function_type * type = nullptr)
+    inline auto make_function_expression(function * fun,
+        function_type * type,
+        scope * lex_scope,
+        std::optional<std::u32string> name)
     {
-        return std::make_unique<function_expression>(fun, type);
+        return std::make_unique<function_expression>(fun, type, lex_scope, std::move(name));
     }
 }
 }

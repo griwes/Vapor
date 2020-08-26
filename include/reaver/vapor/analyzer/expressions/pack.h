@@ -36,7 +36,7 @@ inline namespace _v1
     {
     public:
         pack_expression(std::vector<expression *> exprs, type * pack_type)
-            : _exprs{ std::move(exprs) }, _type{ pack_type }
+            : expression{ nullptr, std::nullopt }, _exprs{ std::move(exprs) }, _type{ pack_type }
         {
             _set_type(_type);
         }
@@ -67,9 +67,9 @@ inline namespace _v1
             auto rhs_pack = rhs->as<pack_expression>();
             return _exprs.size() == rhs_pack->_exprs.size()
                 && std::equal(
-                       _exprs.begin(), _exprs.end(), rhs_pack->_exprs.begin(), [](auto && lhs, auto && rhs) {
-                           return lhs->is_equal(rhs);
-                       });
+                    _exprs.begin(), _exprs.end(), rhs_pack->_exprs.begin(), [](auto && lhs, auto && rhs) {
+                        return lhs->is_equal(rhs);
+                    });
         }
 
         virtual std::unique_ptr<google::protobuf::Message> _generate_interface() const override

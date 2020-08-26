@@ -38,7 +38,6 @@ inline namespace _v1
         struct function_value
         {
             std::u32string name;
-            std::vector<scope> scopes;
             std::shared_ptr<function_type> type;
         };
 

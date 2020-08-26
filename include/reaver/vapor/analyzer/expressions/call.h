@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2019 Michał "Griwes" Dominiak
+ * Copyright © 2017-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -35,8 +35,13 @@ inline namespace _v1
     public:
         call_expression(function * fun,
             std::unique_ptr<expression> vtable_arg,
-            std::vector<expression *> args)
-            : _function{ fun }, _vtable_arg{ std::move(vtable_arg) }, _args{ std::move(args) }
+            std::vector<expression *> args,
+            scope * lex_scope,
+            std::optional<std::u32string> name)
+            : expression{ lex_scope, std::move(name) },
+              _function{ fun },
+              _vtable_arg{ std::move(vtable_arg) },
+              _args{ std::move(args) }
         {
         }
 
@@ -53,7 +58,7 @@ inline namespace _v1
             }
         }
 
-        const range_type & get_range() const
+        range_type get_range() const
         {
             return get_ast_info().value().range;
         }
@@ -104,10 +109,14 @@ inline namespace _v1
     public:
         owning_call_expression(function * fun,
             std::unique_ptr<expression> vtable_arg,
-            std::vector<std::unique_ptr<expression>> args)
+            std::vector<std::unique_ptr<expression>> args,
+            scope * lex_scope,
+            std::optional<std::u32string> name)
             : call_expression{ fun,
                   std::move(vtable_arg),
-                  fmap(args, [](auto && arg) { return arg.get(); }) },
+                  fmap(args, [](auto && arg) { return arg.get(); }),
+                  lex_scope,
+                  std::move(name) },
               _var_exprs{ std::move(args) }
         {
         }
@@ -118,11 +127,15 @@ inline namespace _v1
         std::vector<std::unique_ptr<expression>> _var_exprs;
     };
 
-    inline auto make_call_expression(function * fun, expression * vtable_arg, std::vector<expression *> args)
+    inline auto make_call_expression(function * fun,
+        expression * vtable_arg,
+        std::vector<expression *> args,
+        scope * lex_scope,
+        std::optional<std::u32string> name)
     {
         replacements repl;
         return std::make_unique<call_expression>(
-            fun, fun->vtable_slot() ? repl.claim(vtable_arg) : nullptr, args);
+            fun, fun->vtable_slot() ? repl.claim(vtable_arg) : nullptr, args, lex_scope, std::move(name));
     }
 }
 }

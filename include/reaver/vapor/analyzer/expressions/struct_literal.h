@@ -42,8 +42,6 @@ inline namespace _v1
         virtual void mark_exported() override;
 
     private:
-        virtual void _set_name(std::u32string name) override;
-
         virtual expression * _get_replacement() override
         {
             return _type->get_expression();
@@ -88,6 +86,7 @@ inline namespace _v1
 
     std::unique_ptr<struct_literal> preanalyze_struct_literal(precontext & ctx,
         const parser::struct_literal & parse,
-        scope * lex_scope);
+        scope * lex_scope,
+        std::optional<std::u32string> canonical_name = std::nullopt);
 }
 }

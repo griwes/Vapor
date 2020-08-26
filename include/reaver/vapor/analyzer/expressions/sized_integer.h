@@ -36,8 +36,11 @@ inline namespace _v1
     class sized_integer_constant : public constant
     {
     public:
-        sized_integer_constant(sized_integer * type, boost::multiprecision::cpp_int value)
-            : constant{ type }, _value{ std::move(value) }, _type{ type }
+        sized_integer_constant(sized_integer * type,
+            boost::multiprecision::cpp_int value,
+            scope * lex_scope,
+            std::optional<std::u32string> name)
+            : constant{ type, lex_scope, std::move(name) }, _value{ std::move(value) }, _type{ type }
         {
             assert(_value <= _type->max_value());
             assert(_value >= _type->min_value());
@@ -67,7 +70,7 @@ inline namespace _v1
     private:
         virtual std::unique_ptr<expression> _clone_expr(replacements &) const override
         {
-            return std::make_unique<sized_integer_constant>(_type, _value);
+            return std::make_unique<sized_integer_constant>(_type, _value, get_scope(), get_name());
         }
 
         virtual constant_init_ir _constinit_ir(ir_generation_context &) const override;

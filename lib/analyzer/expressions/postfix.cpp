@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -37,16 +37,21 @@ inline namespace _v1
 {
     std::unique_ptr<postfix_expression> preanalyze_postfix_expression(precontext & ctx,
         const parser::postfix_expression & parse,
-        scope * lex_scope)
+        scope * lex_scope,
+        std::optional<std::u32string> name)
     {
         return std::make_unique<postfix_expression>(make_node(parse),
+            lex_scope,
+            name,
             std::get<0>(fmap(parse.base_expression,
                 make_overload_set(
                     [&](const parser::identifier & ident) -> std::unique_ptr<expression> {
-                        return preanalyze_identifier(ctx, ident, lex_scope);
+                        return preanalyze_identifier(
+                            ctx, ident, lex_scope, parse.modifier_type ? std::nullopt : name);
                     },
                     [&](const parser::expression & expr) -> std::unique_ptr<expression> {
-                        return preanalyze_expression(ctx, expr, lex_scope);
+                        return preanalyze_expression(
+                            ctx, expr, lex_scope, parse.modifier_type ? std::nullopt : name);
                     },
                     [&](auto &&) -> std::unique_ptr<expression> { assert(0); }))),
             parse.modifier_type,
@@ -55,11 +60,14 @@ inline namespace _v1
     }
 
     postfix_expression::postfix_expression(ast_node parse,
+        scope * lex_scope,
+        std::optional<std::u32string> name,
         std::unique_ptr<expression> base,
         std::optional<lexer::token_type> mod,
         std::vector<std::unique_ptr<expression>> arguments,
         std::optional<std::u32string> accessed_member)
-        : _base_expr{ std::move(base) },
+        : expression{ lex_scope, std::move(name) },
+          _base_expr{ std::move(base) },
           _modifier{ mod },
           _arguments{ std::move(arguments) },
           _accessed_member{ std::move(accessed_member) }
@@ -177,6 +185,8 @@ inline namespace _v1
 
                 return resolve_overload(ctx,
                     get_ast_info()->range,
+                    get_scope(),
+                    get_name(),
                     _base_expr.get(),
                     *_modifier,
                     fmap(_arguments, [](auto && arg) { return arg.get(); }))
@@ -188,13 +198,7 @@ inline namespace _v1
                         _call_expression = std::move(call_expr);
                         return _call_expression->analyze(ctx);
                     })
-                    .then([&] {
-                        this->_set_type(_call_expression->get_type());
-                        if (has_entity_name())
-                        {
-                            _call_expression->set_name(get_entity_name());
-                        }
-                    });
+                    .then([&] { this->_set_type(_call_expression->get_type()); });
             });
     }
 
@@ -212,8 +216,13 @@ inline namespace _v1
         }
 
         assert(_arguments.empty());
-        auto ret = std::unique_ptr<postfix_expression>(
-            new postfix_expression(get_ast_info().value(), std::move(base), _modifier, {}, _accessed_member));
+        auto ret = std::unique_ptr<postfix_expression>(new postfix_expression(get_ast_info().value(),
+            get_scope(),
+            get_name(),
+            std::move(base),
+            _modifier,
+            {},
+            _accessed_member));
 
         auto type = ret->_base_expr->get_type();
 
@@ -263,10 +272,6 @@ inline namespace _v1
 
                 if (!_modifier)
                 {
-                    if (has_entity_name())
-                    {
-                        _base_expr->set_name(get_entity_name());
-                    }
                     return make_ready_future(_base_expr.release());
                 }
 
@@ -274,8 +279,10 @@ inline namespace _v1
                 {
                     if (!_referenced_expression.value()->is_member())
                     {
-                        return _referenced_expression.value()->simplify_expr(ctx).then(
-                            [](auto && simpl) { return make_expression_ref(simpl, std::nullopt).release(); });
+                        return _referenced_expression.value()->simplify_expr(ctx).then([this](auto && simpl) {
+                            return make_expression_ref(simpl, get_scope(), get_name(), std::nullopt)
+                                .release();
+                        });
                     }
 
                     if (!_base_expr->is_constant())
@@ -285,7 +292,7 @@ inline namespace _v1
 
                     assert(_referenced_expression.value()->is_member());
                     auto member = _base_expr->get_member(
-                        _referenced_expression.value()->as<member_expression>()->get_name());
+                        _referenced_expression.value()->as<member_expression>()->get_name().value());
                     assert(member);
 
                     if (!member->is_constant())

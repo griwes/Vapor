@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -28,16 +28,36 @@
 #include "vapor/analyzer/expressions/expression_ref.h"
 #include "vapor/analyzer/expressions/function.h"
 #include "vapor/analyzer/expressions/integer.h"
+#include "vapor/analyzer/expressions/runtime_value.h"
 #include "vapor/analyzer/expressions/type.h"
 #include "vapor/analyzer/semantic/function.h"
 #include "vapor/analyzer/semantic/symbol.h"
 #include "vapor/analyzer/types/sized_integer.h"
+#include "vapor/analyzer/types/typeclass_instance.h"
 
 namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
-    std::unordered_set<std::u32string> reserved_identifiers = { U"type", U"bool", U"int", U"sized_int" };
+    std::unordered_set<std::u32string> reserved_identifiers = { U"type",
+        U"bool",
+        U"int",
+        U"sized_int",
+        U"default" };
+
+    scope::scope(_key,
+        scope * parent_scope,
+        scope_kind kind,
+        bool is_shadowing_boundary,
+        bool is_special,
+        const scope * other)
+        : _parent{ parent_scope },
+          _global{ _parent ? _parent->_global : nullptr },
+          _scope_kind{ kind },
+          _is_shadowing_boundary{ is_shadowing_boundary },
+          _is_special{ is_special }
+    {
+    }
 
     scope::~scope()
     {
@@ -57,6 +77,40 @@ inline namespace _v1
         {
             _parent->close();
         }
+    }
+
+    scope * scope::clone_for_decl()
+    {
+        if (_scope_kind == scope_kind::local)
+        {
+            return new scope{ _key{}, this, _scope_kind, false };
+        }
+
+        return this;
+    }
+
+    std::unique_ptr<scope> scope::clone_for_module(std::u32string name)
+    {
+        auto ret = std::make_unique<scope>(_key{}, this, scope_kind::module, true);
+        ret->set_name(std::move(name));
+        return ret;
+    }
+
+    std::unique_ptr<scope> scope::clone_for_type(std::u32string name)
+    {
+        auto ret = std::make_unique<scope>(_key{}, this, scope_kind::type, true);
+        ret->set_name(std::move(name));
+        return ret;
+    }
+
+    std::unique_ptr<scope> scope::_clone_for_default_instance()
+    {
+        return std::make_unique<scope>(_key{}, this, scope_kind::type, true, true);
+    }
+
+    std::unique_ptr<scope> scope::clone_for_local()
+    {
+        return std::make_unique<scope>(_key{}, this, scope_kind::local, true);
     }
 
     symbol * scope::init(const std::u32string & name, std::unique_ptr<symbol> symb)
@@ -85,6 +139,18 @@ inline namespace _v1
 
         _symbols_in_order.push_back(symb.get());
         return _symbols.emplace(name, std::move(symb)).first->second.get();
+    }
+
+    symbol * scope::init_unnamed(std::unique_ptr<symbol> symb)
+    {
+        assert(!_is_closed);
+        assert(symb->get_name() == U"");
+
+        auto ret = symb.get();
+        _unnamed_symbols.push_back(std::move(symb));
+        _symbols_in_order.push_back(ret);
+
+        return ret;
     }
 
     symbol * scope::get(const std::u32string & name) const
@@ -141,6 +207,23 @@ inline namespace _v1
         throw failed_lookup(name);
     }
 
+    std::vector<symbol *> scope::declared_symbols() const
+    {
+        assert(_is_closed);
+
+        std::vector<symbol *> ret;
+        ret.reserve(_symbols.size() + _unnamed_symbols.size());
+        for (auto && [_, symb] : _symbols)
+        {
+            ret.push_back(symb.get());
+        }
+        for (auto && symb : _unnamed_symbols)
+        {
+            ret.push_back(symb.get());
+        }
+        return ret;
+    }
+
     void initialize_global_scope(scope * lex_scope, std::vector<std::shared_ptr<void>> & keepalive_list)
     {
         lex_scope->mark_global();
@@ -149,33 +232,66 @@ inline namespace _v1
         auto boolean_type_expr = builtin_types().boolean->get_expression();
         auto type_type_expr = builtin_types().type->get_expression();
 
-        auto sized_int = make_function("sized_int");
-        sized_int->set_return_type(builtin_types().type->get_expression());
-        sized_int->set_parameters({ integer_type_expr });
-
-        sized_int->add_analysis_hook(
-            [](analysis_context & ctx, call_expression * expr, std::vector<expression *> args) {
-                assert(args.size() == 2 && args[1]->get_type() == builtin_types().integer.get());
-                auto int_var = static_cast<integer_constant *>(args[1]);
-                auto size = int_var->get_value().convert_to<std::size_t>();
-
-                auto type = ctx.get_sized_integer_type(size);
-                expr->replace_with(make_expression_ref(type->get_expression(), expr->get_ast_info()));
-
-                return make_ready_future();
-            });
-
-        auto sized_int_expr = std::unique_ptr<expression>{ make_function_expression(sized_int.get()) };
-        keepalive_list.emplace_back(std::move(sized_int));
-
         auto add_symbol = [&](auto name, auto && expr) { lex_scope->init(name, make_symbol(name, expr)); };
 
         add_symbol(U"int", integer_type_expr);
         add_symbol(U"bool", boolean_type_expr);
         add_symbol(U"type", type_type_expr);
 
+        auto sized_int = make_function("sized_int");
+        sized_int->set_return_type(type_type_expr);
+        sized_int->set_parameters(
+            unique_expr_list(make_runtime_value(builtin_types().integer, nullptr, std::nullopt)));
+
+        sized_int->add_analysis_hook(
+            [](analysis_context & ctx, call_expression * expr, std::vector<expression *> args) {
+                assert(args.size() == 2 && args[1]->is_constant());
+                auto int_expr = args[1]->as<integer_constant>();
+                assert(int_expr);
+                auto size = int_expr->get_value().convert_to<std::size_t>();
+
+                auto type = ctx.get_sized_integer_type(size);
+                expr->replace_with(make_expression_ref(
+                    type->get_expression(), expr->get_scope(), expr->get_name(), expr->get_ast_info()));
+
+                return make_ready_future();
+            });
+
+        auto sized_int_expr = make_function_expression(sized_int.get(), nullptr, lex_scope, U"sized_int");
+        keepalive_list.emplace_back(std::move(sized_int));
+
         add_symbol(U"sized_int", sized_int_expr.get());
         keepalive_list.emplace_back(std::move(sized_int_expr));
+
+        auto instance_type_expr = make_runtime_value(builtin_types().type, nullptr, std::nullopt);
+        auto default_ = make_function("default");
+        default_->set_return_type(instance_type_expr.get());
+        default_->set_parameters(unique_expr_list(std::move(instance_type_expr)));
+
+        default_->add_analysis_hook(
+            [](analysis_context & ctx, call_expression * expr, std::vector<expression *> args) {
+                assert(args.size() == 2 && args[1]->is_constant());
+                auto instance_type_expr = args[1]->as<type_expression>();
+                assert(instance_type_expr);
+                auto instance_type = dynamic_cast<typeclass_instance_type *>(instance_type_expr->get_value());
+                assert(instance_type);
+
+                return ctx.default_instances_future()
+                    .then([&ctx, call = expr, inst = instance_type] {
+                        return ctx.resolve_default_instance(
+                            call->get_range(), call->get_scope(), call->get_name(), inst);
+                    })
+                    .then([&ctx, call = expr, instance_type](auto && inst_expr) {
+                        assert(inst_expr->get_type() == instance_type);
+                        call->replace_with(std::move(inst_expr));
+                    });
+            });
+
+        auto default_expr = make_function_expression(default_.get(), nullptr, lex_scope, U"default");
+        keepalive_list.emplace_back(std::move(default_));
+
+        add_symbol(U"default", default_expr.get());
+        keepalive_list.emplace_back(std::move(default_expr));
     }
 }
 }

@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -38,6 +38,8 @@ inline namespace _v1
     class overload_set_expression_base : public expression
     {
     public:
+        using expression::expression;
+
         virtual void print(std::ostream & os, print_context) const override
         {
             assert(0);
@@ -55,12 +57,15 @@ inline namespace _v1
     class overload_set_expression : public overload_set_expression_base
     {
     public:
-        overload_set_expression(scope * lex_scope);
-        overload_set_expression(std::shared_ptr<overload_set> t);
+        overload_set_expression(scope * lex_scope, std::u32string name);
+        overload_set_expression(std::shared_ptr<overload_set> t, scope * lex_scope, std::u32string name);
 
         // TODO: =default once I've thrown the analysis future nonsense out of this hierarchy
         // and into analysis_context
-        overload_set_expression(const overload_set_expression & other) : _oset{ other._oset }
+        overload_set_expression(const overload_set_expression & other,
+            scope * lex_scope,
+            std::optional<std::u32string> name)
+            : overload_set_expression_base{ lex_scope, std::move(name) }, _oset{ other._oset }
         {
             _set_type(_oset->get_type());
         }
@@ -91,12 +96,17 @@ inline namespace _v1
     class refined_overload_set_expression : public overload_set_expression_base
     {
     public:
-        refined_overload_set_expression(overload_set * base);
-        refined_overload_set_expression(std::shared_ptr<refined_overload_set> oset);
+        refined_overload_set_expression(overload_set * base, scope * lex_scope, std::u32string name);
+        refined_overload_set_expression(std::shared_ptr<refined_overload_set> oset,
+            scope * lex_scope,
+            std::u32string name);
 
         // TODO: =default once I've thrown the analysis future nonsense out of this hierarchy
         // and into analysis_context
-        refined_overload_set_expression(const refined_overload_set_expression & other) : _oset{ other._oset }
+        refined_overload_set_expression(const refined_overload_set_expression & other,
+            scope * lex_scope,
+            std::optional<std::u32string> name)
+            : overload_set_expression_base{ lex_scope, std::move(name) }, _oset{ other._oset }
         {
             _set_type(_oset->get_type());
         }
@@ -148,7 +158,9 @@ inline namespace _v1
     class unresolved_overload_set_expression : public overload_set_expression_base
     {
     public:
-        unresolved_overload_set_expression(precontext & ctx, const proto::user_defined_reference * udr);
+        unresolved_overload_set_expression(precontext & ctx,
+            const proto::user_defined_reference * udr,
+            scope * lex_scope);
 
         virtual overload_set_base * get_overload_set() const override;
         virtual bool is_constant() const override;
@@ -167,6 +179,7 @@ inline namespace _v1
 
     std::unique_ptr<unresolved_overload_set_expression> make_unresolved_overload_set_expression(
         precontext & ctx,
-        const proto::user_defined_reference * udr);
+        const proto::user_defined_reference * udr,
+        scope * lex_scope);
 }
 }

@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -27,6 +27,7 @@
 #include <reaver/traits.h>
 
 #include "vapor/analyzer/expressions/typeclass.h"
+#include "vapor/analyzer/expressions/typeclass_instance.h"
 #include "vapor/analyzer/precontext.h"
 #include "vapor/analyzer/types/sized_integer.h"
 #include "vapor/parser.h"
@@ -55,24 +56,22 @@ inline namespace _v1
 
             if (!saved)
             {
-                auto scope = lex_scope->clone_for_class();
-                scope->set_name(name_part, codegen::ir::scope_type::module);
-
-                auto old_scope = lex_scope;
-                lex_scope = scope.get();
+                auto scope = lex_scope->clone_for_module(name_part);
+                auto old_scope = std::exchange(lex_scope, scope.get());
 
                 auto type_uptr = std::make_unique<module_type>(std::move(scope), utf8(name_part));
                 type = type_uptr.get();
 
-                saved = make_entity(std::move(type_uptr));
+                saved = make_entity(std::move(type_uptr), old_scope, name_part);
                 saved->mark_local();
                 assert(old_scope->init(name_part, make_symbol(name_part, saved.get())));
             }
 
             else
             {
-                assert(dynamic_cast<module_type *>(saved->get_type()));
-                lex_scope = saved->get_type()->get_scope();
+                type = dynamic_cast<module_type *>(saved->get_type());
+                assert(type);
+                lex_scope = type->get_scope();
             }
 
             return name_part;
@@ -85,14 +84,17 @@ inline namespace _v1
             return ret;
         });
 
-        return std::make_unique<module>(make_node(parse), std::move(name), type, std::move(statements));
+        return std::make_unique<module>(
+            make_node(parse), lex_scope, name.back(), std::move(name), type, std::move(statements));
     }
 
     module::module(ast_node parse,
+        scope * lex_scope,
+        std::u32string canonical_name,
         std::vector<std::u32string> name,
         module_type * type,
         std::vector<std::unique_ptr<statement>> stmts)
-        : expression{ type },
+        : expression{ type, lex_scope, std::move(canonical_name) },
           _parse{ parse },
           _type{ type },
           _name{ std::move(name) },
@@ -155,38 +157,11 @@ inline namespace _v1
         }
     }
 
-    declaration_ir module::declaration_codegen_ir(ir_generation_context & ctx) const
-    {
-        auto scope = _type->get_scope();
-        auto scopes = scope->codegen_ir();
-
-        auto mod = mbind(scope->symbols_in_order(), [&](auto && symbol) {
-            return fmap(symbol->codegen_ir(ctx), [&](auto && decl) {
-                return fmap(decl,
-                    make_overload_set(
-                        [&](std::shared_ptr<codegen::ir::variable> symb) {
-                            symb->declared = true;
-                            symb->scopes = scopes;
-                            symb->name = symbol->get_name();
-                            return symb;
-                        },
-                        [&](auto && symb) {
-                            symb.scopes = scopes;
-                            symb.name = symbol->get_name();
-                            return symb;
-                        }));
-            });
-        });
-
-        return mod;
-    }
-
     void module::generate_interface(proto::module & mod) const
     {
-        auto scope = _type->get_scope();
-        auto own_scope_ir = scope->codegen_ir();
+        auto own_scope = _type->get_scope();
 
-        auto name = fmap(_name, utf8);
+        auto name = fmap(_name, [](auto && arg) { return utf8(std::forward<decltype(arg)>(arg)); });
         std::copy(name.begin(), name.end(), RepeatedFieldBackInserter(mod.mutable_name()));
 
         std::unordered_set<expression *> associated_entities;
@@ -195,7 +170,7 @@ inline namespace _v1
 
         auto & mut_symbols = *mod.mutable_symbols();
 
-        for (auto && [_, symbol] : scope->declared_symbols())
+        for (auto && symbol : own_scope->declared_symbols())
         {
             if (!symbol->is_exported())
             {
@@ -212,7 +187,7 @@ inline namespace _v1
 
         for (auto && associated : associated_entities)
         {
-            if (auto && scope = [&]() -> class scope * {
+            if (auto scope = [&]() -> class scope * {
                     if (auto && type_expr = associated->as<type_expression>())
                     {
                         return type_expr->get_value()->get_scope();
@@ -226,9 +201,17 @@ inline namespace _v1
                     return nullptr;
                 }())
             {
-                auto && scope_ir = scope->codegen_ir();
-
-                if (codegen::ir::same_module(scope_ir, own_scope_ir))
+                if ([&] {
+                        while (scope)
+                        {
+                            if (scope == own_scope)
+                            {
+                                return true;
+                            }
+                            scope = scope->parent();
+                        }
+                        return false;
+                    }())
                 {
                     exported_entities.insert(associated);
                 }
@@ -242,13 +225,25 @@ inline namespace _v1
 
         for (auto && entity : exported_entities)
         {
-            auto & symb = mut_symbols[utf8(entity->get_entity_name())];
-            entity->generate_interface(symb);
+            auto ent_name = entity->get_entity_name();
 
-            auto it = named_exports.find(entity);
-            if (it != named_exports.end())
+            if (ent_name)
             {
-                symb.set_is_name_exported(true);
+                auto & symb = mut_symbols[utf8(ent_name.value())];
+                entity->generate_interface(symb);
+
+                auto it = named_exports.find(entity);
+                if (it != named_exports.end())
+                {
+                    symb.set_is_name_exported(true);
+                }
+            }
+            else
+            {
+                auto instance = entity->as<typeclass_instance_expression>();
+                assert(instance);
+                auto exported = mod.add_default_instances();
+                instance->generate_interface(*exported);
             }
         }
     }

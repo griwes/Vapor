@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -33,7 +33,7 @@ inline namespace _v1
     {
     public:
         struct_expression(std::shared_ptr<struct_type> type, std::vector<std::unique_ptr<expression>> fields)
-            : expression{ type.get() }, _type{ type }
+            : expression{ type.get(), type->get_scope()->parent(), std::nullopt }, _type{ type }
         {
             auto members = _type->get_data_members();
 

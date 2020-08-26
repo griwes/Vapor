@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -35,8 +35,8 @@ inline namespace _v1
     class overload_set_type : public user_defined_type
     {
     public:
-        overload_set_type(scope * lex_scope, overload_set * oset)
-            : user_defined_type{ lex_scope }, _oset{ oset }
+        overload_set_type(std::unique_ptr<scope> lex_scope, overload_set * oset)
+            : user_defined_type{ std::move(lex_scope) }, _oset{ oset }
         {
         }
 
@@ -56,13 +56,8 @@ inline namespace _v1
     private:
         virtual std::unique_ptr<google::protobuf::Message> _user_defined_interface() const override;
 
-        virtual void _codegen_type(ir_generation_context &,
+        virtual void _codegen_user_type(ir_generation_context &,
             std::shared_ptr<codegen::ir::user_type>) const override;
-
-        virtual std::u32string _codegen_name(ir_generation_context & ctx) const override
-        {
-            return get_name();
-        }
 
         overload_set * _oset = nullptr;
         bool _is_exported = false;

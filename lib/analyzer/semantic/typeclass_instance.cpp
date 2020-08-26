@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2019 Michał "Griwes" Dominiak
+ * Copyright © 2019-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -40,23 +40,49 @@ inline namespace _v1
 {
     std::unique_ptr<typeclass_instance> make_typeclass_instance(precontext & ctx,
         const parser::instance_literal & parse,
-        scope * lex_scope)
+        scope * lex_scope,
+        bool is_default,
+        std::optional<std::u32string> canonical_name)
     {
-        auto scope = lex_scope->clone_for_class();
+        auto scope = [&] {
+            if (is_default)
+            {
+                return lex_scope->_clone_for_default_instance();
+            }
+
+            assert(canonical_name);
+            auto name = std::move(canonical_name.value());
+
+            return lex_scope->clone_for_type(std::move(name));
+        }();
         auto scope_ptr = scope.get();
 
-        return std::make_unique<typeclass_instance>(make_node(parse),
+        auto ret = std::make_unique<typeclass_instance>(make_node(parse),
             std::move(scope),
             fmap(parse.typeclass_name.id_expression_value, [&](auto && t) { return t.value.string; }),
-            fmap(parse.arguments, [&](auto && arg) { return preanalyze_expression(ctx, arg, scope_ptr); }));
+            fmap(parse.arguments, [&](auto && arg) { return preanalyze_expression(ctx, arg, lex_scope); }));
+        if (is_default)
+        {
+            ret->mark_default();
+        }
+        return ret;
     }
 
     std::unique_ptr<typeclass_instance> import_typeclass_instance(precontext & ctx,
         imported_type type,
-        const proto::typeclass_instance & inst)
+        const proto::typeclass_instance & inst,
+        bool is_default)
     {
-        return std::make_unique<typeclass_instance>(
-            imported_ast_node(ctx, inst.range()), ctx.current_lex_scope->clone_for_class(), std::move(type));
+        auto ret = std::make_unique<typeclass_instance>(imported_ast_node(ctx, inst.range()),
+            is_default ? ctx.current_lex_scope->_clone_for_default_instance()
+                       : ctx.current_lex_scope->clone_for_type(
+                           utf32(ctx.current_symbol).substr(ctx.current_lex_scope->get_scoped_name().size())),
+            std::move(type));
+        if (is_default)
+        {
+            ret->mark_default();
+        }
+        return ret;
     }
 
     typeclass_instance::typeclass_instance(ast_node parse,
@@ -73,7 +99,10 @@ inline namespace _v1
     typeclass_instance::typeclass_instance(ast_node parse,
         std::unique_ptr<scope> member_scope,
         imported_type type)
-        : _node{ parse }, _scope{ std::move(member_scope) }, _typeclass_reference{ std::move(type) }
+        : _node{ parse },
+          _scope{ std::move(member_scope) },
+          _typeclass_reference{ std::move(type) },
+          _imported{ true }
     {
     }
 
@@ -105,6 +134,14 @@ inline namespace _v1
 
     void typeclass_instance::set_type(typeclass_instance_type * type)
     {
+        if (_arguments.empty())
+        {
+            // fix arguments for an imported typeclass instance
+            _arguments = fmap(type->get_arguments(), [&](auto && type) {
+                return make_expression_ref(type->get_expression(), nullptr, std::nullopt, std::nullopt);
+            });
+        }
+
         for (auto && [oset_name, oset] : type->get_overload_sets())
         {
             _member_overload_set_exprs.push_back(create_refined_overload_set(_scope.get(), oset_name, oset));
@@ -114,6 +151,11 @@ inline namespace _v1
         // assertion that checks for closeness of the scope needs to be somehow weakened here, to allow for
         // more sensible error reporting than `assert`
         _scope->close();
+
+        if (_default)
+        {
+            _scope->set_name(U"defaults$" + type->codegen_name());
+        }
 
         _type = type;
     }
@@ -138,10 +180,15 @@ inline namespace _v1
             auto && roset = roset_expr->get_overload_set();
             roset->resolve_overrides();
 
-            auto scopes_gen = [this, name = roset->get_type()->get_name()](auto && ctx) {
-                auto instance_scopes = this->get_scope()->codegen_ir();
-                instance_scopes.push_back(codegen::ir::scope{ name, codegen::ir::scope_type::type });
-                return instance_scopes;
+            auto scope_gen = [this, name = roset->get_type()->get_scope()->get_name()]() {
+                if (!_default)
+                {
+                    return std::u32string{ this->get_scope()->get_entity_name() } + U"."
+                        + std::u32string{ name };
+                }
+
+                return std::u32string{ U"defaults$" } + std::u32string{ get_type()->codegen_name() } + U"."
+                    + std::u32string{ name };
             };
 
             auto && base = roset->get_base();
@@ -151,7 +198,6 @@ inline namespace _v1
                 if (auto refinement = roset->get_vtable_entry(fn->vtable_slot().value()))
                 {
                     repl.add_replacement(fn, refinement);
-                    refinement->set_scopes_generator(scopes_gen);
                     continue;
                 }
 
@@ -160,8 +206,7 @@ inline namespace _v1
                 _function_specialization fn_spec;
                 fn_spec.spec = make_function(fn->get_explanation(), fn->get_range());
 
-                fn_spec.spec->set_name(U"call");
-                fn_spec.spec->set_scopes_generator(scopes_gen);
+                fn_spec.spec->set_name(scope_gen() + U".call");
 
                 repl.add_replacement(fn, fn_spec.spec.get());
                 fn_spec.spec->set_return_type(fn->return_type_expression());
@@ -176,9 +221,7 @@ inline namespace _v1
                                 param->codegen_ir(ctx).back().result);
                         });
 
-                        auto ret = codegen::ir::function{ U"call",
-                            {},
-                            std::move(params),
+                        auto ret = codegen::ir::function{ std::move(params),
                             codegen::ir::make_variable(fn->return_type_expression()
                                                            ->as<type_expression>()
                                                            ->get_value()
@@ -219,15 +262,14 @@ inline namespace _v1
 
             fn_spec.spec->set_body(fn_spec.function_body.get());
             fn_spec.spec->set_codegen([this, fn = fn_spec.spec.get()](ir_generation_context & ctx) {
-                auto ret = codegen::ir::function{ U"call",
-                    {},
-                    fmap(fn->parameters(),
-                        [&](auto && param) {
-                            return std::get<std::shared_ptr<codegen::ir::variable>>(
-                                param->codegen_ir(ctx).back().result);
-                        }),
-                    fn->get_body()->codegen_return(ctx),
-                    fn->get_body()->codegen_ir(ctx) };
+                auto ret =
+                    codegen::ir::function{ fmap(fn->parameters(),
+                                               [&](auto && param) {
+                                                   return std::get<std::shared_ptr<codegen::ir::variable>>(
+                                                       param->codegen_ir(ctx).back().result);
+                                               }),
+                        fn->get_body()->codegen_return(ctx),
+                        fn->get_body()->codegen_ir(ctx) };
                 ret.is_exported = _exported;
                 return ret;
             });
@@ -236,11 +278,31 @@ inline namespace _v1
 
     void typeclass_instance::mark_exported()
     {
+        // TODO: make this only get exported when all of the arguments are exported
+        // should also be an error to try to export an instance that refers to non-exported arguments
+
         _exported = true;
         for (auto && oset : _member_overload_set_exprs)
         {
             oset->mark_exported();
         }
+    }
+
+    bool typeclass_instance::is_imported() const
+    {
+        return _imported;
+    }
+
+    void typeclass_instance::mark_default()
+    {
+        _default = true;
+
+        mark_exported();
+    }
+
+    bool typeclass_instance::is_default() const
+    {
+        return _default;
     }
 
     const typeclass * typeclass_instance::get_typeclass() const
@@ -288,13 +350,6 @@ inline namespace _v1
                 spec_info.function_body->print(os, body_ctx.make_branch(true));
             }
         }
-    }
-
-    void typeclass_instance::set_name(std::u32string name)
-    {
-        assert(!_name);
-        _scope->set_name(name, codegen::ir::scope_type::type);
-        _name = std::move(name);
     }
 
     std::unique_ptr<proto::typeclass_instance> typeclass_instance::generate_interface() const

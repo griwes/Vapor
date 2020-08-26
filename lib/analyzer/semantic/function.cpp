@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -31,7 +31,9 @@ namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
-    future<expression *> function::simplify(recursive_context ctx, std::vector<expression *> arguments)
+    future<expression *> function::simplify(recursive_context ctx,
+        call_expression * call_expr,
+        std::vector<expression *> arguments)
     {
         if (_vtable_id)
         {
@@ -129,7 +131,7 @@ inline namespace _v1
 
         if (_compile_time_eval)
         {
-            return (*_compile_time_eval)(ctx, arguments);
+            return (*_compile_time_eval)(ctx, call_expr, arguments);
         }
 
         return make_ready_future<expression *>(nullptr);
@@ -218,11 +220,6 @@ inline namespace _v1
                 _ir->is_exported = true;
             }
 
-            if (_scopes_generator)
-            {
-                _ir->scopes = _scopes_generator.value()(ctx);
-            }
-
             if (_entry)
             {
                 _ir->is_entry = true;
@@ -236,26 +233,18 @@ inline namespace _v1
         }
 
         ctx.top_level_generation = state;
+        _ir->name = *_name;
 
         return *_ir;
     }
 
     codegen::ir::function_value function::pointer_ir(ir_generation_context & ctx) const
     {
-        auto scopes = [&]() -> std::vector<codegen::ir::scope> {
-            if (_scopes_generator)
-            {
-                return _scopes_generator.value()(ctx);
-            }
-            return {};
-        }();
-
         assert(_return_type_expression);
         auto ret_type_expr = _return_type_expression->as<type_expression>();
         assert(ret_type_expr);
 
         return { *_name,
-            std::move(scopes),
             codegen::ir::builtin_types().function(ret_type_expr->get_value()->codegen_type(ctx),
                 fmap(_parameters, [&](auto && param) { return param->get_type()->codegen_type(ctx); })) };
     }

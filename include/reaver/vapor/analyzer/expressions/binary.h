@@ -36,7 +36,9 @@ inline namespace _v1
         binary_expression(ast_node parse,
             lexer::token op,
             std::unique_ptr<expression> lhs,
-            std::unique_ptr<expression> rhs);
+            std::unique_ptr<expression> rhs,
+            scope * lex_scope,
+            std::optional<std::u32string> name);
 
         virtual void print(std::ostream & os, print_context ctx) const override;
 
@@ -100,6 +102,7 @@ inline namespace _v1
     struct precontext;
     std::unique_ptr<binary_expression> preanalyze_binary_expression(precontext & ctx,
         const parser::binary_expression & parse,
-        scope * lex_scope);
+        scope * lex_scope,
+        std::optional<std::u32string> name);
 }
 }

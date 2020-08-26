@@ -34,22 +34,18 @@ inline namespace _v1
     {
     public:
         member_expression(type * parent_type, std::u32string name, type * own_type)
-            : expression{ own_type }, _parent{ parent_type }, _name{ std::move(name) }
+            : expression{ own_type, parent_type ? parent_type->get_scope() : nullptr, std::move(name) },
+              _parent{ parent_type }
         {
         }
 
         codegen::ir::member_variable member_codegen_ir(ir_generation_context & ctx) const;
 
-        const std::u32string & get_name() const
-        {
-            return _name;
-        }
-
         virtual void print(std::ostream & os, print_context ctx) const override
         {
             os << styles::def << ctx << styles::rule_name << "member-expression";
             os << styles::def << " @ " << styles::address << this << styles::def << ": ";
-            os << styles::string_value << utf8(_name) << styles::def << '\n';
+            os << styles::string_value << utf8(get_name().value()) << styles::def << '\n';
 
             auto type_ctx = ctx.make_branch(false);
             os << styles::def << type_ctx << styles::subrule_name << "type:\n";
@@ -77,12 +73,13 @@ inline namespace _v1
             assert(!_parent);
             assert(parent_type);
             _parent = parent_type;
+            _set_scope(parent_type->get_scope());
         }
 
     private:
         virtual std::unique_ptr<expression> _clone_expr(replacements &) const override
         {
-            return std::make_unique<member_expression>(_parent, _name, get_type());
+            return std::make_unique<member_expression>(_parent, get_name().value(), get_type());
         }
 
         virtual statement_ir _codegen_ir(ir_generation_context & ctx) const override
@@ -106,7 +103,6 @@ inline namespace _v1
         }
 
         type * _parent = nullptr;
-        std::u32string _name;
     };
 
     inline auto make_member_expression(type * parent, std::u32string name, type * own_type)

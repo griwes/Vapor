@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2018-2019 Michał "Griwes" Dominiak
+ * Copyright © 2018-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -61,14 +61,18 @@ inline namespace _v1
         void add_symbol(std::string name, expression * ent, bool is_visible = true);
         void close_scope();
 
-    private:
-        virtual void _codegen_type(ir_generation_context &,
-            std::shared_ptr<codegen::ir::user_type>) const override
+        virtual std::u32string codegen_name() const override
         {
             assert(0);
         }
 
-        virtual std::u32string _codegen_name(ir_generation_context &) const override
+        virtual bool is_meta() const override
+        {
+            return true;
+        }
+
+    private:
+        virtual void _codegen_type(ir_generation_context &) const override
         {
             assert(0);
         }

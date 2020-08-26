@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -38,7 +38,7 @@ inline namespace _v1
         const parser::function_declaration & parse,
         scope *& lex_scope)
     {
-        auto function_scope = lex_scope->clone_local();
+        auto function_scope = lex_scope->clone_for_local();
 
         parameter_list params;
         if (parse.parameters)
@@ -61,7 +61,7 @@ inline namespace _v1
         scope *& lex_scope,
         typeclass_instance_type * instance_type)
     {
-        auto function_scope = lex_scope->clone_local();
+        auto function_scope = lex_scope->clone_for_local();
 
         function * original_overload = nullptr;
         std::optional<instance_function_context> fn_ctx;
@@ -147,9 +147,6 @@ inline namespace _v1
 
         _function = make_function(utf8(_name), get_ast_info().value().range);
         _function->set_name(U"call");
-        _function->set_scopes_generator(
-            [this](auto && ctx) { return this->_overload_set_expression->get_type()->codegen_scopes(ctx); });
-
         _overload_set_expression->get_overload_set()->add_function(_function.get());
     }
 
@@ -218,7 +215,7 @@ inline namespace _v1
 
             return (*_return_type)->analyze(ctx).then([&] {
                 auto & type_expr = *_return_type;
-                assert(type_expr->get_type() == builtin_types().type.get());
+                assert(type_expr->get_type() == builtin_types().type);
                 assert(type_expr->is_constant());
 
                 _function->set_return_type(_return_type->get()->_get_replacement());
@@ -230,10 +227,8 @@ inline namespace _v1
                 return when_all(fmap(_parameter_list, [&](auto && param) { return param->analyze(ctx); }));
             })
             .then([&] {
-                auto params =
-                    fmap(_parameter_list, [](auto && param) -> expression * { return param.get(); });
-
-                _function->set_parameters(std::move(params));
+                _function->set_parameters(
+                    fmap(_parameter_list, [](auto && param) -> expression * { return param.get(); }));
             });
     }
 
@@ -243,17 +238,18 @@ inline namespace _v1
 
         return base_future
             .then([&] {
-                _function->set_name(U"call");
+                _function->set_name(
+                    _overload_set_expression->get_overload_set()->get_scope()->get_entity_name() + U".call");
                 _function->set_codegen([=](ir_generation_context & ctx) {
-                    auto ret = codegen::ir::function{ U"call",
-                        {},
+                    auto ret = codegen::ir::function{
                         fmap(_parameter_list,
                             [&](auto && param) {
                                 return std::get<std::shared_ptr<codegen::ir::variable>>(
                                     param->codegen_ir(ctx).back().result);
                             }),
                         _body->codegen_return(ctx),
-                        _body->codegen_ir(ctx) };
+                        _body->codegen_ir(ctx)
+                    };
                     return ret;
                 });
 

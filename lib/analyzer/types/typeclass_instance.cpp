@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2019 Michał "Griwes" Dominiak
+ * Copyright © 2019-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -37,8 +37,19 @@ namespace reaver::vapor::analyzer
 inline namespace _v1
 {
     typeclass_instance_type::typeclass_instance_type(typeclass * tc, std::vector<type *> arguments)
-        : _arguments{ std::move(arguments) }, _ctx{ tc, _arguments }
+        : type{ dont_init_expr, std::make_unique<scope>() },
+          _arguments{ std::move(arguments) },
+          _ctx{ tc, _arguments }
     {
+        auto scope_name = U"tci$" + std::u32string{ _ctx.tc->get_scope()->get_entity_name() } + U"("
+            + boost::join(
+                fmap(_arguments, [&](type * arg) { return std::u32string{ arg->codegen_name() }; }), U", ")
+            + U")";
+        get_scope()->set_name(scope_name);
+        _oset_scope->set_name(scope_name);
+
+        _init_expr();
+
         auto repl = _ctx.get_replacements();
         std::unordered_map<function *, block *> function_block_defs;
 
@@ -160,35 +171,24 @@ inline namespace _v1
         }));
     }
 
-    void typeclass_instance_type::_codegen_type(ir_generation_context & ctx,
-        std::shared_ptr<codegen::ir::user_type> actual_type) const
+    void typeclass_instance_type::_codegen_type(ir_generation_context & ctx) const
     {
+        auto actual_type = std::make_shared<codegen::ir::user_type>();
+        _codegen_t = actual_type;
+
         auto members = fmap(_member_expressions, [&](auto && member) {
             auto ret = member->member_codegen_ir(ctx);
-
-            // set scopes on the overload set type
-            auto udt = dynamic_cast<codegen::ir::user_type *>(ret.type.get());
-            assert(udt); // ...a type of an overload set better be an UDT...
-            udt->scopes = codegen_scopes(ctx);
-
             return codegen::ir::member{ std::move(ret) };
         });
 
-        auto type =
-            codegen::ir::user_type{ _codegen_name(ctx), get_scope()->codegen_ir(), 0, std::move(members) };
+        auto type = codegen::ir::user_type{ codegen_name(), 0, std::move(members) };
 
         *actual_type = std::move(type);
     }
 
-    std::u32string typeclass_instance_type::_codegen_name(ir_generation_context & ctx) const
+    std::u32string typeclass_instance_type::codegen_name() const
     {
-        return U"tci$"
-            + boost::join(
-                fmap(_ctx.tc->get_scope()->codegen_ir(), [](auto && scope) { return scope.name; }), U".")
-            + U"." + _ctx.tc->codegen_name(ctx) + U"("
-            + boost::join(
-                fmap(_arguments, [&](type * arg) { return arg->codegen_scopes(ctx).back().name; }), ", ")
-            + U")";
+        return get_scope()->get_entity_name();
     }
 }
 }

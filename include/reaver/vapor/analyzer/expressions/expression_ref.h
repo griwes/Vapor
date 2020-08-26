@@ -31,14 +31,23 @@ inline namespace _v1
     class expression_ref : public expression
     {
     protected:
-        expression_ref() = default;
+        using expression::expression;
 
     public:
-        expression_ref(expression * expr) : _referenced{ expr }
+        expression_ref(expression * expr,
+            scope * lex_scope,
+            std::optional<std::u32string> name,
+            std::optional<ast_node> parse)
+            : expression{ lex_scope, std::move(name) }, _referenced{ expr }
         {
             if (auto type = _referenced->try_get_type())
             {
                 _set_type(type);
+            }
+
+            if (parse)
+            {
+                _set_ast_info(parse.value());
             }
         }
 
@@ -98,17 +107,7 @@ inline namespace _v1
                 referenced = replaced;
             }
 
-            auto ret = std::make_unique<expression_ref>(referenced);
-            if (auto ast_info = get_ast_info())
-            {
-                ret->_set_ast_info(ast_info.value());
-            }
-            if (has_entity_name())
-            {
-                ret->set_name(get_entity_name());
-            }
-
-            return ret;
+            return std::make_unique<expression_ref>(referenced, get_scope(), get_name(), get_ast_info());
         }
 
         virtual future<expression *> _simplify_expr(recursive_context ctx) override
@@ -158,14 +157,11 @@ inline namespace _v1
     };
 
     inline std::unique_ptr<expression> make_expression_ref(expression * expr,
+        scope * lex_scope,
+        std::optional<std::u32string> name,
         std::optional<ast_node> ast_info)
     {
-        auto ret = std::make_unique<expression_ref>(expr);
-        if (ast_info)
-        {
-            ret->_set_ast_info(ast_info.value());
-        }
-        return ret;
+        return std::make_unique<expression_ref>(expr, lex_scope, std::move(name), ast_info);
     }
 }
 }

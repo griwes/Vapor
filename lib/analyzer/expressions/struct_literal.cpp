@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -31,13 +31,18 @@ inline namespace _v1
 {
     std::unique_ptr<struct_literal> preanalyze_struct_literal(precontext & ctx,
         const parser::struct_literal & parse,
-        scope * lex_scope)
+        scope * lex_scope,
+        std::optional<std::u32string> canonical_name)
     {
-        return std::make_unique<struct_literal>(make_node(parse), make_struct_type(ctx, parse, lex_scope));
+        return std::make_unique<struct_literal>(
+            make_node(parse), make_struct_type(ctx, parse, lex_scope, canonical_name));
     }
 
     struct_literal::struct_literal(ast_node parse, std::unique_ptr<struct_type> type)
-        : expression{ builtin_types().type.get() }, _type{ std::move(type) }
+        : expression{ builtin_types().type,
+              type->get_scope()->parent(),
+              std::u32string{ type->get_scope()->get_name() } },
+          _type{ std::move(type) }
     {
         _set_ast_info(parse);
     }
@@ -69,11 +74,6 @@ inline namespace _v1
     void struct_literal::mark_exported()
     {
         _type->mark_exported();
-    }
-
-    void struct_literal::_set_name(std::u32string name)
-    {
-        _type->set_name(std::move(name));
     }
 
     future<> struct_literal::_analyze(analysis_context & ctx)

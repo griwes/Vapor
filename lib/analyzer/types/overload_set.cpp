@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -51,7 +51,7 @@ inline namespace _v1
         return make_ready_future(std::vector<function *>{});
     }
 
-    void overload_set_type::_codegen_type(ir_generation_context & ctx,
+    void overload_set_type::_codegen_user_type(ir_generation_context & ctx,
         std::shared_ptr<codegen::ir::user_type> actual_type) const
     {
         auto overloads = _oset->get_overloads();
@@ -85,17 +85,12 @@ inline namespace _v1
             ctx.add_generated_function(fn);
             return codegen::ir::member{ fn->codegen_ir(ctx) };
         });
-        auto type =
-            codegen::ir::user_type{ _codegen_name(ctx), get_scope()->codegen_ir(), 0, std::move(members) };
-
-        auto scopes = get_scope()->codegen_ir();
-        scopes.emplace_back(type.name, codegen::ir::scope_type::type);
+        auto type = codegen::ir::user_type{ get_scope()->get_entity_name(), 0, std::move(members) };
 
         fmap(type.members, [&](auto && member) {
             fmap(member,
                 make_overload_set(
                     [&](codegen::ir::function & fn) {
-                        fn.scopes = scopes;
                         fn.parent_type = actual_type;
                         fn.is_exported = _is_exported;
 
@@ -116,7 +111,7 @@ inline namespace _v1
     {
         os << styles::def << ctx << styles::type << "overload set type";
         os << styles::def << " @ " << styles::address << this << styles::def << ": " << styles::string_value
-           << utf8(get_name()) << '\n';
+           << utf8(get_scope()->get_name()) << '\n';
     }
 
     std::unique_ptr<google::protobuf::Message> overload_set_type::_user_defined_interface() const

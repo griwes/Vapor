@@ -1,0 +1,20 @@
+// IGNORE: true
+
+import export_typeclass;
+
+module export_default_external_typeclass
+{
+    let int32 = sized_int(32);
+
+    default instance export_typeclass.exported(int32) {
+        function with_default(arg) {
+            return arg * 3 - 5;
+        }
+
+        function without_default(arg) {
+            return arg / 2;
+        }
+    };
+}
+
+// vim: filetype=cpp

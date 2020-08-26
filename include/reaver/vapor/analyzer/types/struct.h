@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -109,7 +109,7 @@ inline namespace _v1
 
     private:
         virtual std::unique_ptr<google::protobuf::Message> _user_defined_interface() const override;
-        virtual void _codegen_type(ir_generation_context &,
+        virtual void _codegen_user_type(ir_generation_context &,
             std::shared_ptr<codegen::ir::user_type>) const override;
 
         ast_node _parse;
@@ -125,11 +125,6 @@ inline namespace _v1
         std::unique_ptr<function> _aggregate_copy_ctor;
         future_promise_pair<function *> _aggregate_copy_ctor_pair;
         std::vector<std::unique_ptr<expression>> _default_copy_arguments;
-
-        virtual std::u32string _codegen_name(ir_generation_context & ctx) const override
-        {
-            return get_name();
-        }
     };
 }
 }
@@ -155,7 +150,8 @@ inline namespace _v1
 
     std::unique_ptr<struct_type> make_struct_type(precontext & ctx,
         const parser::struct_literal & parse,
-        scope * lex_scope);
+        scope * lex_scope,
+        std::optional<std::u32string> canonical_name = std::nullopt);
     std::unique_ptr<struct_type> import_struct_type(precontext & ctx, const proto::struct_type &);
 }
 }

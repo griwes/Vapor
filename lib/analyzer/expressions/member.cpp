@@ -29,7 +29,7 @@ inline namespace _v1
 {
     codegen::ir::member_variable member_expression::member_codegen_ir(ir_generation_context & ctx) const
     {
-        return codegen::ir::member_variable{ _name, get_type()->codegen_type(ctx) };
+        return codegen::ir::member_variable{ get_name().value(), get_type()->codegen_type(ctx) };
     }
 }
 }

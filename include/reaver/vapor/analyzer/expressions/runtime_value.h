@@ -41,7 +41,7 @@ inline namespace _v1
     private:
         virtual std::unique_ptr<expression> _clone_expr(replacements &) const override
         {
-            return std::make_unique<runtime_value_expression>(get_type());
+            return std::make_unique<runtime_value_expression>(get_type(), get_scope(), get_name());
         }
 
         virtual statement_ir _codegen_ir(ir_generation_context & ctx) const override
@@ -64,9 +64,11 @@ inline namespace _v1
         }
     };
 
-    inline std::unique_ptr<expression> make_runtime_value(type * t)
+    inline std::unique_ptr<expression> make_runtime_value(type * t,
+        scope * lex_scope,
+        std::optional<std::u32string> name = std::nullopt)
     {
-        return std::make_unique<runtime_value_expression>(t);
+        return std::make_unique<runtime_value_expression>(t, lex_scope, std::move(name));
     }
 }
 }

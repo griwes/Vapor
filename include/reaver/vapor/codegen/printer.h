@@ -29,7 +29,6 @@
 #include <reaver/prelude/functor.h>
 
 #include "generator.h"
-#include "ir/scope.h"
 #include "ir/variable.h"
 
 namespace reaver::vapor::codegen
@@ -55,11 +54,6 @@ inline namespace _v1
             std::stringstream ss;
             ss << ptr;
             return utf32(ss.str());
-        }
-
-        static std::u32string _scope_string(const std::vector<ir::scope> & sc)
-        {
-            return boost::algorithm::join(fmap(sc, [&](auto && scope) { return scope.name; }), U".");
         }
 
         static std::u32string _to_string(const ir::value &);

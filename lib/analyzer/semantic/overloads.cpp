@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2019 Michał "Griwes" Dominiak
+ * Copyright © 2017-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -211,7 +211,13 @@ inline namespace _v1
             ++param_begin;
         }
 
-        assert(arg_begin == arg_end);
+        if (arg_begin != arg_end)
+        {
+            logger::dlog() << overload->explain() << " not considered; argument #"
+                           << arg_begin - arguments.begin() << " exceeds the number of parameters";
+            logger::dlog() << "argument type: " << (*arg_begin)->get_type()->explain();
+            return false;
+        }
 
         auto ret = std::all_of(param_begin, param_end, [&](auto && param) {
             return std::find(provided_params.begin(), provided_params.end(), param) != provided_params.end()
@@ -227,7 +233,9 @@ inline namespace _v1
         return ret;
     }
 
-    auto prepare_actual_arguments(function * overload,
+    auto prepare_actual_arguments(scope * lex_scope,
+        const std::optional<std::u32string> & name,
+        function * overload,
         std::vector<expression *> arguments,
         expression * base = nullptr)
     {
@@ -252,7 +260,7 @@ inline namespace _v1
 
         auto handle_conversion = [&](expression *& expr, type * conv) {
             // stupid leak
-            expr = make_conversion_expression(expr, conv).release();
+            expr = make_conversion_expression(expr, conv, lex_scope, name).release();
         };
 
         // I actually do need to erase my ownerships here
@@ -352,6 +360,8 @@ inline namespace _v1
 
     future<std::unique_ptr<expression>> select_overload(analysis_context & ctx,
         const range_type & range,
+        scope * lex_scope,
+        std::optional<std::u32string> name,
         std::vector<expression *> arguments,
         std::vector<function *> possible_overloads,
         expression * base)
@@ -406,24 +416,31 @@ inline namespace _v1
         }
 
         auto overload = best_matches.front();
-        auto actual_arguments = prepare_actual_arguments(overload, arguments, base);
-        auto ret = make_call_expression(overload, base, std::move(actual_arguments));
+        auto actual_arguments = prepare_actual_arguments(lex_scope, name, overload, arguments, base);
+        auto ret =
+            make_call_expression(overload, base, std::move(actual_arguments), lex_scope, std::move(name));
         return make_ready_future<std::unique_ptr<expression>>(std::move(ret));
     }
 
     future<std::unique_ptr<expression>> resolve_overload(analysis_context & ctx,
         const range_type & range,
+        scope * lex_scope,
+        std::optional<std::u32string> name,
         expression * lhs,
         expression * rhs,
         lexer::token_type op)
     {
-        return lhs->get_type()->get_candidates(op).then([&ctx, range, lhs, rhs](auto && overloads) {
-            return select_overload(ctx, range, std::vector<expression *>{ lhs, rhs }, overloads);
-        });
+        return lhs->get_type()->get_candidates(op).then(
+            [&ctx, range, lex_scope, name = std::move(name), lhs, rhs](auto && overloads) {
+                return select_overload(
+                    ctx, range, lex_scope, std::move(name), std::vector<expression *>{ lhs, rhs }, overloads);
+            });
     }
 
     future<std::unique_ptr<expression>> resolve_overload(analysis_context & ctx,
         const range_type & range,
+        scope * lex_scope,
+        std::optional<std::u32string> name,
         expression * base_expr,
         lexer::token_type bracket_type,
         std::vector<expression *> arguments)
@@ -432,15 +449,15 @@ inline namespace _v1
         return base_expr->get_type()
             ->get_candidates(bracket_type)
             .then([&ctx](auto overloads) {
-                return when_all(fmap(overloads,
-                                    [&ctx](auto && overload) {
-                                        return when_all(fmap(overload->parameters(),
-                                            [&ctx](auto && overload) { return overload->analyze(ctx); }));
-                                    }))
-                    .then([overloads] { return overloads; });
+                return when_all(fmap(overloads, [&ctx](auto && overload) {
+                    return when_all(fmap(
+                        overload->parameters(), [&ctx](auto && overload) { return overload->analyze(ctx); }));
+                })).then([overloads] { return overloads; });
             })
-            .then([&ctx, range, arguments, base_expr](auto overloads) mutable {
-                return select_overload(ctx, range, std::move(arguments), overloads, base_expr);
+            .then([&ctx, range, lex_scope, name = std::move(name), arguments, base_expr](
+                      auto overloads) mutable {
+                return select_overload(
+                    ctx, range, lex_scope, std::move(name), std::move(arguments), overloads, base_expr);
             });
     }
 }

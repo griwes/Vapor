@@ -47,7 +47,10 @@ inline namespace _v1
 
         auto ret = std::make_unique<declaration>(make_node(parse),
             parse.identifier.value.string,
-            fmap(parse.rhs, [&](auto && expr) { return preanalyze_expression(ctx, expr, old_scope); }),
+            fmap(parse.rhs,
+                [&](auto && expr) {
+                    return preanalyze_expression(ctx, expr, old_scope, parse.identifier.value.string);
+                }),
             fmap(parse.type_expression,
                 [&](auto && expr) { return preanalyze_expression(ctx, expr, old_scope); }),
             new_scope,
@@ -105,11 +108,6 @@ inline namespace _v1
         {
             assert(0);
         }
-
-        fmap(_init_expr, [&](auto && expr) {
-            expr->set_name(_name);
-            return unit{};
-        });
     }
 
     void declaration::print(std::ostream & os, print_context ctx) const
@@ -137,7 +135,7 @@ inline namespace _v1
         fmap(_type_specifier, [&](auto && expr) {
             fut = fut.then([&]() { return expr->analyze(ctx); }).then([&]() {
                 auto && type_expr = _type_specifier.value();
-                assert(type_expr->get_type() == builtin_types().type.get());
+                assert(type_expr->get_type() == builtin_types().type);
                 assert(type_expr->is_constant());
             });
 
@@ -212,7 +210,7 @@ inline namespace _v1
 
     statement_ir declaration::_codegen_ir(ir_generation_context & ctx) const
     {
-        if (_declared_symbol->get_type() == builtin_types().type.get())
+        if (_declared_symbol->get_type() == builtin_types().type)
         {
             return {};
         }

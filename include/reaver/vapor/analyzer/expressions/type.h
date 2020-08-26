@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -29,31 +29,15 @@ namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
-    enum class type_kind
-    {
-        type
-    };
-
     class type_expression : public constant
     {
-    private:
-        type * _select(type_kind kind)
-        {
-            switch (kind)
-            {
-                case type_kind::type:
-                    return builtin_types().type.get();
-            }
-
-            assert(0);
-        }
-
     public:
-        type_expression(type * t, type_kind kind = type_kind::type) : constant{ _select(kind) }, _type{ t }
-        {
-        }
-
-        type_expression(type * t, type * base_type) : constant{ base_type }, _type{ t }
+        type_expression(type * t)
+            : constant{ builtin_types().type,
+                  t->get_scope() ? t->get_scope()->parent() : nullptr,
+                  t->get_scope() ? std::optional<std::u32string>{ t->get_scope()->get_name() }
+                                 : std::nullopt },
+              _type{ t }
         {
         }
 

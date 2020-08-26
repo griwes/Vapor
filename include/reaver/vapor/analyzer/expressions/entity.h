@@ -32,9 +32,12 @@ inline namespace _v1
     class entity : public expression
     {
     public:
-        entity(type *, std::unique_ptr<expression> value = nullptr);
-        entity(std::unique_ptr<type>, std::unique_ptr<expression> value = nullptr);
-        entity(std::shared_ptr<unresolved_type>, std::unique_ptr<expression> value = nullptr);
+        entity(type *, scope *, std::u32string, std::unique_ptr<expression> = nullptr);
+        entity(std::unique_ptr<type>, scope *, std::u32string, std::unique_ptr<expression> = nullptr);
+        entity(std::shared_ptr<unresolved_type>,
+            scope *,
+            std::u32string,
+            std::unique_ptr<expression> = nullptr);
 
         virtual void print(std::ostream &, print_context) const override;
 
@@ -131,15 +134,18 @@ inline namespace _v1
         symbol * _symbol = nullptr;
     };
 
-    inline std::unique_ptr<entity> make_entity(imported_type imported)
+    inline std::unique_ptr<entity> make_entity(imported_type imported, scope * lex_scope, std::u32string name)
     {
-        return std::get<0>(
-            fmap(imported, [](auto && imported) { return std::make_unique<entity>(std::move(imported)); }));
+        return std::get<0>(fmap(imported, [&](auto && imported) {
+            return std::make_unique<entity>(std::move(imported), lex_scope, std::move(name));
+        }));
     }
 
-    inline std::unique_ptr<entity> make_entity(std::unique_ptr<type> owned)
+    inline std::unique_ptr<entity> make_entity(std::unique_ptr<type> owned,
+        scope * lex_scope,
+        std::u32string name)
     {
-        return std::make_unique<entity>(std::move(owned));
+        return std::make_unique<entity>(std::move(owned), lex_scope, std::move(name));
     }
 
     std::unique_ptr<entity> get_entity(precontext &, const proto::entity &);

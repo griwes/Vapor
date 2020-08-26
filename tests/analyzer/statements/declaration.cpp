@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2018 Michał "Griwes" Dominiak
+ * Copyright © 2017-2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -59,10 +59,10 @@ MAYFLY_ADD_TESTCASE("non-member, explicit type, initializer", [] {
         auto analysis_future = decl->analyze(ctx);
         reaver::get(analysis_future);
 
-        MAYFLY_CHECK(decl->declared_symbol()->get_expression()->get_type() == builtin_types().integer.get());
-        MAYFLY_CHECK(decl->initializer_expression().value()->get_type() == builtin_types().integer.get());
+        MAYFLY_CHECK(decl->declared_symbol()->get_expression()->get_type() == builtin_types().integer);
+        MAYFLY_CHECK(decl->initializer_expression().value()->get_type() == builtin_types().integer);
 
-        integer_constant expected_value{ 1 };
+        integer_constant expected_value{ 1, nullptr, std::nullopt };
         MAYFLY_CHECK(decl->initializer_expression().value()->is_equal(&expected_value));
 
         auto init_expr = decl->initializer_expression().value();
@@ -75,7 +75,7 @@ MAYFLY_ADD_TESTCASE("non-member, explicit type, initializer", [] {
 
     {
         scope s1;
-        auto s2 = s1.clone_local();
+        auto s2 = s1.clone_for_local();
         auto current_scope = s2.get();
 
         auto ast = parse(U"let foo : int = 1;",
@@ -108,10 +108,10 @@ MAYFLY_ADD_TESTCASE("non-member, deduced type, initializer", [] {
         auto analysis_future = decl->analyze(ctx);
         reaver::get(analysis_future);
 
-        MAYFLY_CHECK(decl->declared_symbol()->get_expression()->get_type() == builtin_types().integer.get());
-        MAYFLY_CHECK(decl->initializer_expression().value()->get_type() == builtin_types().integer.get());
+        MAYFLY_CHECK(decl->declared_symbol()->get_expression()->get_type() == builtin_types().integer);
+        MAYFLY_CHECK(decl->initializer_expression().value()->get_type() == builtin_types().integer);
 
-        integer_constant expected_value{ 1 };
+        integer_constant expected_value{ 1, nullptr, std::nullopt };
         MAYFLY_CHECK(decl->initializer_expression().value()->is_equal(&expected_value));
     }
 });
@@ -134,10 +134,10 @@ MAYFLY_ADD_TESTCASE("member, deduced type, initializer", [] {
         auto analysis_future = decl->analyze(ctx);
         reaver::get(analysis_future);
 
-        MAYFLY_CHECK(decl->declared_symbol()->get_expression()->get_type() == builtin_types().integer.get());
-        MAYFLY_CHECK(decl->initializer_expression().value()->get_type() == builtin_types().integer.get());
+        MAYFLY_CHECK(decl->declared_symbol()->get_expression()->get_type() == builtin_types().integer);
+        MAYFLY_CHECK(decl->initializer_expression().value()->get_type() == builtin_types().integer);
 
-        integer_constant expected_value{ 1 };
+        integer_constant expected_value{ 1, nullptr, std::nullopt };
         MAYFLY_CHECK(decl->initializer_expression().value()->is_equal(&expected_value));
         MAYFLY_CHECK(decl->declared_symbol()->get_expression()->is_member());
         MAYFLY_CHECK(
@@ -165,7 +165,7 @@ MAYFLY_ADD_TESTCASE("member, explicit type, no initializer", [] {
         auto analysis_future = decl->analyze(ctx);
         reaver::get(analysis_future);
 
-        MAYFLY_CHECK(decl->declared_symbol()->get_expression()->get_type() == builtin_types().integer.get());
+        MAYFLY_CHECK(decl->declared_symbol()->get_expression()->get_type() == builtin_types().integer);
         MAYFLY_CHECK(decl->declared_symbol()->get_expression()->is_member());
     }
 });

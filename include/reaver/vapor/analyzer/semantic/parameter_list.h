@@ -38,7 +38,7 @@ inline namespace _v1
     class parameter : public expression
     {
     public:
-        parameter(ast_node parse, std::u32string name, std::unique_ptr<expression> type);
+        parameter(ast_node parse, scope * lex_scope, std::u32string name, std::unique_ptr<expression> type);
         ~parameter();
 
         virtual void print(std::ostream & os, print_context ctx) const override;
@@ -46,11 +46,6 @@ inline namespace _v1
         expression * get_type_expression() const
         {
             return _type_expression.get();
-        }
-
-        const std::u32string & get_name() const
-        {
-            return _name;
         }
 
     private:
@@ -67,7 +62,6 @@ inline namespace _v1
         virtual constant_init_ir _constinit_ir(ir_generation_context &) const override;
         virtual std::unique_ptr<google::protobuf::Message> _generate_interface() const override;
 
-        std::u32string _name;
         std::unique_ptr<expression> _type_expression;
 
         std::unique_ptr<archetype> _archetype;

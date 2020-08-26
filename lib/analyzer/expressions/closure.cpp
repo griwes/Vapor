@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -32,11 +32,12 @@ inline namespace _v1
 {
     std::unique_ptr<closure> preanalyze_closure(precontext & ctx,
         const parser::lambda_expression & parse,
-        scope * lex_scope)
+        scope * lex_scope,
+        std::optional<std::u32string> name)
     {
         assert(!parse.captures);
 
-        auto local_scope = lex_scope->clone_local();
+        auto local_scope = lex_scope->clone_for_local();
         parameter_list params;
 
         if (parse.parameters)
@@ -51,15 +52,20 @@ inline namespace _v1
             std::move(params),
             preanalyze_block(ctx, parse.body, scope, true),
             fmap(parse.return_type,
-                [&](auto && ret_type) { return preanalyze_expression(ctx, ret_type, scope); }));
+                [&](auto && ret_type) { return preanalyze_expression(ctx, ret_type, scope); }),
+            lex_scope,
+            std::move(name));
     }
 
     closure::closure(ast_node parse,
         std::unique_ptr<scope> sc,
         parameter_list params,
         std::unique_ptr<block> body,
-        std::optional<std::unique_ptr<expression>> return_type)
-        : _parameter_list{ std::move(params) },
+        std::optional<std::unique_ptr<expression>> return_type,
+        scope * lex_scope,
+        std::optional<std::u32string> name)
+        : expression{ lex_scope, std::move(name) },
+          _parameter_list{ std::move(params) },
           _return_type{ std::move(return_type) },
           _scope{ std::move(sc) },
           _body{ std::move(body) }
@@ -100,13 +106,15 @@ inline namespace _v1
 
     future<> closure::_analyze(analysis_context & ctx)
     {
+        _scope->set_name(U"closure$" + utf32(std::to_string(ctx.closure_index++)));
+
         auto initial_future = [&] {
             if (_return_type)
             {
                 return (*_return_type)->analyze(ctx).then([&] {
                     auto & type_expr = *_return_type;
 
-                    assert(type_expr->get_type() == builtin_types().type.get());
+                    assert(type_expr->get_type() == builtin_types().type);
                     assert(type_expr->is_constant());
                 });
             }
@@ -130,16 +138,14 @@ inline namespace _v1
                 auto ret_expr = _return_type ? _return_type->get()->_get_replacement()
                                              : _body->return_type()->get_expression();
 
-                auto function = make_function("closure", get_ast_info().value().range);
-                function->set_name(U"operator()");
+                auto function = make_function("closure call", get_ast_info().value().range);
+                function->set_name(_scope->get_entity_name() + U".call");
                 function->set_body(_body.get());
                 function->set_return_type(ret_expr);
                 function->set_parameters(
                     fmap(_parameter_list, [](auto && param) -> expression * { return param.get(); }));
                 function->set_codegen([this](ir_generation_context & ctx) {
                     auto ret = codegen::ir::function{
-                        U"operator()",
-                        {},
                         fmap(_parameter_list,
                             [&](auto && param) {
                                 return std::get<std::shared_ptr<codegen::ir::variable>>(
@@ -153,10 +159,8 @@ inline namespace _v1
                 });
 
                 auto fn_ptr = function.get();
-                _type = std::make_unique<closure_type>(_scope.get(), this, std::move(function));
+                _type = std::make_unique<closure_type>(this, std::move(_scope), std::move(function));
                 this->_set_type(_type.get());
-
-                fn_ptr->set_scopes_generator([this](auto && ctx) { return _type->codegen_scopes(ctx); });
             });
     }
 
@@ -175,8 +179,13 @@ inline namespace _v1
 
     statement_ir closure::_codegen_ir(ir_generation_context & ctx) const
     {
+        // assert(0); // something is fucky in this function
         auto var = codegen::ir::make_variable(get_type()->codegen_type(ctx));
-        var->scopes = _type->get_scope()->codegen_ir();
+        if (get_name())
+        {
+            var->name =
+                std::u32string{ get_type()->get_scope()->parent()->get_scoped_name() } + get_name().value();
+        }
         return { codegen::ir::instruction{ std::nullopt,
             std::nullopt,
             { boost::typeindex::type_id<codegen::ir::materialization_instruction>() },

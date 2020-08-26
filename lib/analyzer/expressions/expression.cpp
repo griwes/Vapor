@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -45,7 +45,8 @@ inline namespace _v1
 {
     std::unique_ptr<expression> preanalyze_expression(precontext & ctx,
         const parser::_v1::expression & expr,
-        scope * lex_scope)
+        scope * lex_scope,
+        std::optional<std::u32string> canonical_name)
     {
         return std::get<0>(fmap(expr.expression_value,
             make_overload_set(
@@ -54,26 +55,27 @@ inline namespace _v1
                     return nullptr;
                 },
 
-                [](const parser::integer_literal & integer) -> std::unique_ptr<expression> {
-                    return make_integer_constant(integer);
+                [&](const parser::integer_literal & integer) -> std::unique_ptr<expression> {
+                    return make_integer_constant(integer, lex_scope, std::move(canonical_name));
                 },
 
-                [](const parser::boolean_literal & boolean) -> std::unique_ptr<expression> {
-                    return make_boolean_constant(boolean);
+                [&](const parser::boolean_literal & boolean) -> std::unique_ptr<expression> {
+                    return make_boolean_constant(boolean, lex_scope, std::move(canonical_name));
                 },
 
                 [&](const parser::postfix_expression & postfix) -> std::unique_ptr<expression> {
-                    auto pexpr = preanalyze_postfix_expression(ctx, postfix, lex_scope);
+                    auto pexpr =
+                        preanalyze_postfix_expression(ctx, postfix, lex_scope, std::move(canonical_name));
                     return pexpr;
                 },
 
                 [&](const parser::import_expression & import) -> std::unique_ptr<expression> {
-                    auto impexpr = preanalyze_import(ctx, import, lex_scope, import_mode::expression);
+                    auto impexpr = preanalyze_import(ctx, import, lex_scope, std::move(canonical_name));
                     return impexpr;
                 },
 
                 [&](const parser::lambda_expression & lambda_expr) -> std::unique_ptr<expression> {
-                    auto lambda = preanalyze_closure(ctx, lambda_expr, lex_scope);
+                    auto lambda = preanalyze_closure(ctx, lambda_expr, lex_scope, std::move(canonical_name));
                     return lambda;
                 },
 
@@ -83,31 +85,154 @@ inline namespace _v1
                 },
 
                 [&](const parser::binary_expression & binary_expr) -> std::unique_ptr<expression> {
-                    auto binexpr = preanalyze_binary_expression(ctx, binary_expr, lex_scope);
+                    auto binexpr =
+                        preanalyze_binary_expression(ctx, binary_expr, lex_scope, std::move(canonical_name));
                     return binexpr;
                 },
 
                 [&](const parser::struct_literal & struct_lit) -> std::unique_ptr<expression> {
-                    auto struct_expr = preanalyze_struct_literal(ctx, struct_lit, lex_scope);
+                    auto struct_expr =
+                        preanalyze_struct_literal(ctx, struct_lit, lex_scope, std::move(canonical_name));
                     return struct_expr;
                 },
 
                 [&](const parser::member_expression & mexpr) -> std::unique_ptr<expression> {
-                    auto memexpr = preanalyze_member_access_expression(ctx, mexpr, lex_scope);
+                    auto memexpr =
+                        preanalyze_member_access_expression(ctx, mexpr, lex_scope, std::move(canonical_name));
                     return memexpr;
                 },
 
                 [&](const parser::typeclass_literal & tc) -> std::unique_ptr<expression> {
-                    auto tclit = preanalyze_typeclass_literal(ctx, tc, lex_scope);
+                    auto tclit = preanalyze_typeclass_literal(ctx, tc, lex_scope, std::move(canonical_name));
                     return tclit;
                 },
 
                 [&](const parser::instance_literal & inst) -> std::unique_ptr<expression> {
-                    auto instlit = preanalyze_instance_literal(ctx, inst, lex_scope);
+                    auto instlit =
+                        preanalyze_instance_literal(ctx, inst, lex_scope, false, std::move(canonical_name));
                     return instlit;
                 },
 
                 [](auto &&) -> std::unique_ptr<expression> { assert(0); })));
+    }
+
+    future<expression *> expression::simplify_expr(recursive_context ctx)
+    {
+        return ctx.proper.get_future_or_init(this, [&]() {
+            return make_ready_future()
+                .then([this, ctx]() { return _simplify_expr(ctx); })
+                .then([this](auto && expr) {
+                    logger::dlog(logger::trace)
+                        << "Simplified " << this << " (" << typeid(*this).name() << ") to " << expr << " ("
+                        << (expr ? typeid(*expr).name() : "?") << ")";
+                    return expr;
+                });
+        });
+    }
+
+    bool expression::is_constant() const
+    {
+        auto repl = _get_replacement();
+        assert(repl);
+        return repl != this && repl->is_constant();
+    }
+
+    bool expression::is_equal(const expression * rhs) const
+    {
+        if (this == rhs && _is_pure())
+        {
+            return true;
+        }
+
+        if (_is_equal(rhs) || rhs->_is_equal(this))
+        {
+            return true;
+        }
+
+        auto this_replacement = _get_replacement();
+        auto rhs_replacement = rhs->_get_replacement();
+        if (this != this_replacement || rhs != rhs_replacement)
+        {
+            return this_replacement->_is_equal(rhs_replacement)
+                || rhs_replacement->_is_equal(this_replacement);
+        }
+
+        return false;
+    }
+
+    bool expression::is_different_constant(const expression * rhs)
+    {
+        bool is_c = is_constant();
+
+        if (is_c ^ rhs->is_constant())
+        {
+            return true;
+        }
+
+        return is_c && !is_equal(rhs);
+    }
+
+    std::unique_ptr<expression> expression::convert_to(type * target) const
+    {
+        if (get_type() == target)
+        {
+            assert(0); // I don't know whether I want to support this
+        }
+
+        auto repl = _get_replacement();
+        if (repl == this)
+        {
+            return nullptr;
+        }
+
+        return repl->convert_to(target);
+    }
+
+    bool expression::is_member() const
+    {
+        return false;
+    }
+
+    bool expression::is_member_assignment() const
+    {
+        auto repl = _get_replacement();
+        return repl != this && repl->is_member_assignment();
+    }
+
+    bool expression::is_member_access() const
+    {
+        return false;
+    }
+
+    expression * expression::get_member(const std::u32string & name) const
+    {
+        auto repl = _get_replacement();
+        if (repl == this)
+        {
+            return nullptr;
+        }
+
+        return repl->get_member(name);
+    }
+
+    function * expression::get_vtable_entry(std::size_t) const
+    {
+        return nullptr;
+    }
+
+    std::optional<std::u32string_view> expression::get_entity_name() const
+    {
+        if (!_entity_name)
+        {
+            _entity_name = _get_entity_name();
+        }
+
+        if (_entity_name)
+        {
+            return _entity_name;
+        }
+
+        return std::nullopt;
     }
 
     void expression::generate_interface(proto::entity & entity) const
@@ -161,6 +286,59 @@ inline namespace _v1
         };
 
         return cont(cont);
+    }
+
+    std::optional<std::u32string> expression::_get_entity_name() const
+    {
+        if (!_name)
+        {
+            return std::nullopt;
+        }
+
+        return std::u32string{ _lex_scope->get_scoped_name() } + _name.value();
+    }
+
+    future<> expression::_analyze(analysis_context &)
+    {
+        assert(_type);
+        return make_ready_future();
+    }
+
+    std::unique_ptr<statement> expression::_clone(replacements & repl) const
+    {
+        return _clone_expr(repl);
+    }
+
+    future<statement *> expression::_simplify(recursive_context ctx)
+    {
+        return simplify_expr(ctx).then([&](auto && simplified) -> statement * { return simplified; });
+    }
+
+    future<expression *> expression::_simplify_expr(recursive_context)
+    {
+        return make_ready_future(this);
+    }
+
+    bool expression::_is_equal([[maybe_unused]] const expression * expr) const
+    {
+        return false;
+    }
+
+    bool expression::_is_pure() const
+    {
+        return true;
+    }
+
+    std::unique_ptr<google::protobuf::Message> expression::_generate_interface() const
+    {
+        auto replacement = _get_replacement();
+
+        if (this == replacement)
+        {
+            assert(0);
+        }
+
+        return replacement->_generate_interface();
     }
 }
 }

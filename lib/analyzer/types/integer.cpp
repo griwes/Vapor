@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -22,6 +22,7 @@
 
 #include "vapor/analyzer/types/integer.h"
 #include "vapor/analyzer/expressions/boolean.h"
+#include "vapor/analyzer/expressions/call.h"
 #include "vapor/analyzer/expressions/integer.h"
 #include "vapor/analyzer/expressions/runtime_value.h"
 #include "vapor/analyzer/semantic/symbol.h"
@@ -34,7 +35,7 @@ namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
-    void integer_type::_codegen_type(ir_generation_context &, std::shared_ptr<codegen::ir::user_type>) const
+    void integer_type::_codegen_type(ir_generation_context &) const
     {
         _codegen_t = codegen::ir::builtin_types().integer;
     }
@@ -50,20 +51,16 @@ inline namespace _v1
         Eval eval,
         type * return_type)
     {
-        auto lhs = make_runtime_value(builtin_types().integer.get());
-        auto rhs = make_runtime_value(builtin_types().integer.get());
-
-        auto lhs_arg = lhs.get();
-        auto rhs_arg = rhs.get();
+        auto lhs = make_runtime_value(builtin_types().integer, nullptr, std::nullopt);
+        auto rhs = make_runtime_value(builtin_types().integer, nullptr, std::nullopt);
 
         auto fun = make_function(desc);
         fun->set_name(name);
         fun->set_return_type(return_type->get_expression());
-        fun->set_parameters({ lhs_arg, rhs_arg });
+        fun->set_parameters(unique_expr_list(std::move(lhs), std::move(rhs)));
         fun->set_eval(eval);
         fun->set_intrinsic_codegen(
-            [return_type, lhs = std::move(lhs), rhs = std::move(rhs)](
-                ir_generation_context & ctx, std::vector<codegen::ir::value> arguments) {
+            [return_type](ir_generation_context & ctx, std::vector<codegen::ir::value> arguments) {
                 assert(arguments.size() == 2);
                 auto retval = codegen::ir::make_variable(return_type->codegen_type(ctx));
 
@@ -79,10 +76,10 @@ inline namespace _v1
 #define ADD_OPERATION(NAME, BUILTIN_NAME, OPERATOR, RESULT_TYPE)                                             \
     reaver::vapor::analyzer::_v1::function * reaver::vapor::analyzer::_v1::integer_type::_##NAME()           \
     {                                                                                                        \
-        static auto eval = [](auto &&, const std::vector<expression *> & args) {                             \
+        static auto eval = [](auto &&, call_expression * call, const std::vector<expression *> & args) {     \
             assert(args.size() == 2);                                                                        \
-            assert(args[0]->get_type() == builtin_types().integer.get());                                    \
-            assert(args[1]->get_type() == builtin_types().integer.get());                                    \
+            assert(args[0]->get_type() == builtin_types().integer);                                          \
+            assert(args[1]->get_type() == builtin_types().integer);                                          \
                                                                                                              \
             if (!args[0]->is_constant() || !args[1]->is_constant())                                          \
             {                                                                                                \
@@ -91,12 +88,12 @@ inline namespace _v1
                                                                                                              \
             auto lhs = args[0]->as<integer_constant>();                                                      \
             auto rhs = args[1]->as<integer_constant>();                                                      \
-            return make_ready_future<expression *>(                                                          \
-                std::make_unique<RESULT_TYPE##_constant>(lhs->get_value() OPERATOR rhs->get_value())         \
-                    .release());                                                                             \
+            return make_ready_future<expression *>(std::make_unique<RESULT_TYPE##_constant>(                 \
+                lhs->get_value() OPERATOR rhs->get_value(), call->get_scope(), call->get_name())             \
+                                                       .release());                                          \
         };                                                                                                   \
         static auto NAME = _generate_function<codegen::ir::integer_##NAME##_instruction>(                    \
-            BUILTIN_NAME, "<builtin integer " #NAME ">", eval, builtin_types().RESULT_TYPE.get());           \
+            BUILTIN_NAME, "<builtin integer " #NAME ">", eval, builtin_types().RESULT_TYPE);                 \
         return NAME.get();                                                                                   \
     }
 

@@ -28,12 +28,19 @@ namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
-    std::unique_ptr<expression> make_conversion_expression(std::unique_ptr<expression> expr, type * target);
+    inline std::unique_ptr<expression> make_conversion_expression(std::unique_ptr<expression> expr,
+        type * conv,
+        scope * lex_scope,
+        std::optional<std::u32string> name);
 
     class conversion_expression : public expression
     {
     public:
-        conversion_expression(expression * expr, type * conv) : expression{ conv }, _base{ expr }
+        conversion_expression(expression * expr,
+            type * conv,
+            scope * lex_scope,
+            std::optional<std::u32string> name)
+            : expression{ conv, lex_scope, std::move(name) }, _base{ expr }
         {
         }
 
@@ -82,7 +89,7 @@ inline namespace _v1
     private:
         virtual std::unique_ptr<expression> _clone_expr(replacements & repl) const override
         {
-            return make_conversion_expression(repl.copy_claim(_base), get_type());
+            return make_conversion_expression(repl.copy_claim(_base), get_type(), get_scope(), get_name());
         }
 
         virtual statement_ir _codegen_ir(ir_generation_context &) const override
@@ -106,8 +113,12 @@ inline namespace _v1
     class owning_conversion_expression : public conversion_expression
     {
     public:
-        owning_conversion_expression(std::unique_ptr<expression> expr, type * target)
-            : conversion_expression{ expr.get(), target }, _owned{ std::move(expr) }
+        owning_conversion_expression(std::unique_ptr<expression> expr,
+            type * target,
+            scope * lex_scope,
+            std::optional<std::u32string> name)
+            : conversion_expression{ expr.get(), target, lex_scope, std::move(name) },
+              _owned{ std::move(expr) }
         {
         }
 
@@ -130,21 +141,27 @@ inline namespace _v1
 
         virtual std::unique_ptr<expression> _clone_expr(replacements & repl) const override
         {
-            return make_conversion_expression(repl.claim(_owned.get()), get_type());
+            return make_conversion_expression(repl.claim(_owned.get()), get_type(), get_scope(), get_name());
         }
 
         std::unique_ptr<expression> _owned;
     };
 
-    inline auto make_conversion_expression(expression * expr, type * conv)
+    inline auto make_conversion_expression(expression * expr,
+        type * conv,
+        scope * lex_scope,
+        std::optional<std::u32string> name)
     {
-        return std::make_unique<conversion_expression>(expr, conv);
+        return std::make_unique<conversion_expression>(expr, conv, lex_scope, std::move(name));
     }
 
     inline std::unique_ptr<expression> make_conversion_expression(std::unique_ptr<expression> expr,
-        type * conv)
+        type * conv,
+        scope * lex_scope,
+        std::optional<std::u32string> name)
     {
-        return std::make_unique<owning_conversion_expression>(std::move(expr), conv);
+        return std::make_unique<owning_conversion_expression>(
+            std::move(expr), conv, lex_scope, std::move(name));
     }
 }
 }

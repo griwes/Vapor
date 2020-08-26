@@ -34,9 +34,6 @@ inline namespace _v1
 {
     class symbol
     {
-        using _ulock = std::unique_lock<std::shared_mutex>;
-        using _shlock = std::shared_lock<std::shared_mutex>;
-
     public:
         symbol(std::u32string name, expression * expression)
             : _name{ std::move(name) }, _expression{ expression }
@@ -70,8 +67,6 @@ inline namespace _v1
 
         void set_expression(expression * var)
         {
-            _ulock lock{ _lock };
-
             assert(!_expression && var);
             _expression = var;
             if (_promise)
@@ -82,16 +77,12 @@ inline namespace _v1
 
         expression * get_expression() const
         {
-            _shlock lock{ _lock };
-
             assert(_expression);
             return _expression;
         }
 
         type * get_type() const
         {
-            _shlock lock{ _lock };
-
             assert(_expression);
             return _expression->get_type();
         }
@@ -103,8 +94,6 @@ inline namespace _v1
 
         auto get_expression_future()
         {
-            _ulock lock{ _lock };
-
             if (_expression && !_future)
             {
                 _future = make_ready_future(_expression);
@@ -122,17 +111,13 @@ inline namespace _v1
 
         future<> simplify(recursive_context ctx)
         {
-            return get_expression()->simplify_expr(ctx).then([&](auto && simplified) {
-                _ulock lock{ _lock };
-                _expression = simplified;
-            });
+            return get_expression()->simplify_expr(ctx).then(
+                [&](auto && simplified) { _expression = simplified; });
         }
 
         declaration_ir codegen_ir(ir_generation_context &) const;
 
     private:
-        mutable std::shared_mutex _lock;
-
         bool _is_exported = false;
         bool _hidden = false;
         bool _is_associated = false;

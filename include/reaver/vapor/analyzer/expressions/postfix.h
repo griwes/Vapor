@@ -35,6 +35,8 @@ inline namespace _v1
     {
     public:
         postfix_expression(ast_node parse,
+            scope * lex_scope,
+            std::optional<std::u32string> name,
             std::unique_ptr<expression> base,
             std::optional<lexer::token_type> mod,
             std::vector<std::unique_ptr<expression>> arguments,
@@ -107,6 +109,7 @@ inline namespace _v1
 
     std::unique_ptr<postfix_expression> preanalyze_postfix_expression(precontext & ctx,
         const parser::postfix_expression & parse,
-        scope * lex_scope);
+        scope * lex_scope,
+        std::optional<std::u32string> name);
 }
 }

@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2019 Michał "Griwes" Dominiak
+ * Copyright © 2019-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -41,7 +41,8 @@ inline namespace _v1
 
     std::unique_ptr<overload_set> import_overload_set(precontext & ctx, const proto::overload_set_type & type)
     {
-        auto ret = std::make_unique<overload_set>(ctx.current_lex_scope);
+        auto ret = std::make_unique<overload_set>(ctx.current_lex_scope->clone_for_type(
+            utf32(ctx.current_symbol).substr(ctx.current_lex_scope->get_scoped_name().size())));
 
         assert(type.functions_size() != 0);
 
@@ -53,6 +54,7 @@ inline namespace _v1
             for (auto && param : overload.parameters())
             {
                 auto parm = std::make_unique<parameter>(imported_ast_node(ctx, param.range()),
+                    ctx.current_lex_scope,
                     utf32(param.name()),
                     get_imported_type_ref_expr(ctx, param.type()));
                 imported->parameters.push_back(std::move(parm));
@@ -62,24 +64,22 @@ inline namespace _v1
             imported->function->set_return_type(imported->return_type.get());
             imported->function->set_parameters(
                 fmap(imported->parameters, [](auto && param) { return param.get(); }));
-            imported->function->set_codegen([imported = imported.get(), type = ret->get_type()](
-                                                ir_generation_context & ctx) -> codegen::ir::function {
-                auto params = fmap(imported->parameters, [&](auto && param) {
-                    return std::get<std::shared_ptr<codegen::ir::variable>>(
-                        param->codegen_ir(ctx).back().result);
+            imported->function->set_codegen(
+                [imported = imported.get()](ir_generation_context & ctx) -> codegen::ir::function {
+                    auto params = fmap(imported->parameters, [&](auto && param) {
+                        return std::get<std::shared_ptr<codegen::ir::variable>>(
+                            param->codegen_ir(ctx).back().result);
+                    });
+
+                    auto ret = codegen::ir::function{ std::move(params),
+                        codegen::ir::make_variable(
+                            imported->return_type->as<type_expression>()->get_value()->codegen_type(ctx)),
+                        {} };
+                    ret.is_member = true;
+                    ret.is_defined = false;
+
+                    return ret;
                 });
-
-                auto ret = codegen::ir::function{ U"call",
-                    {},
-                    std::move(params),
-                    codegen::ir::make_variable(
-                        imported->return_type->as<type_expression>()->get_value()->codegen_type(ctx)),
-                    {} };
-                ret.is_member = true;
-                ret.is_defined = false;
-
-                return ret;
-            });
 
             if (overload.is_member())
             {
@@ -91,10 +91,7 @@ inline namespace _v1
                 imported->function->mark_virtual(overload.vtable_id());
             }
 
-            imported->function->set_name(U"call");
-            imported->function->set_scopes_generator(
-                [type = ret->get_type()](auto && ctx) { return type->codegen_scopes(ctx); });
-
+            imported->function->set_name(ret->get_type()->get_scope()->get_entity_name() + U".call");
             ret->add_function(std::move(imported));
         }
 
@@ -120,8 +117,8 @@ inline namespace _v1
         _imported_functions.push_back(std::move(fn));
     }
 
-    overload_set::overload_set(scope * lex_scope)
-        : _type{ std::make_unique<overload_set_type>(lex_scope, this) }
+    overload_set::overload_set(std::unique_ptr<scope> lex_scope)
+        : _type{ std::make_unique<overload_set_type>(std::move(lex_scope), this) }
     {
     }
 
@@ -157,7 +154,9 @@ inline namespace _v1
         }
     }
 
-    refined_overload_set::refined_overload_set(overload_set * base) : _base{ base }
+    refined_overload_set::refined_overload_set(scope * lex_scope, overload_set * base)
+        : _base{ base },
+          _refined_scope{ lex_scope->clone_for_type(std::u32string{ base->get_scope()->get_name() }) }
     {
     }
 

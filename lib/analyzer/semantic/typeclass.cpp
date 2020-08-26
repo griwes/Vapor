@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2019 Michał "Griwes" Dominiak
+ * Copyright © 2019-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -40,9 +40,13 @@ inline namespace _v1
 {
     std::unique_ptr<typeclass> make_typeclass(precontext & ctx,
         const parser::typeclass_literal & parse,
-        scope * lex_scope)
+        scope * lex_scope,
+        std::optional<std::u32string> canonical_name)
     {
-        auto scope = lex_scope->clone_for_class();
+        assert(canonical_name);
+        auto name = std::move(canonical_name.value());
+
+        auto scope = lex_scope->clone_for_type(std::move(name));
         auto scope_ptr = scope.get();
 
         auto params = preanalyze_parameter_list(ctx, parse.parameters, scope_ptr);
@@ -78,7 +82,8 @@ inline namespace _v1
 
     std::unique_ptr<typeclass> import_typeclass(precontext & ctx, const proto::typeclass & tc)
     {
-        auto tc_scope = ctx.current_lex_scope->clone_for_class();
+        auto tc_scope = ctx.current_lex_scope->clone_for_type(
+            utf32(ctx.current_symbol).substr(ctx.current_lex_scope->get_scoped_name().size()));
         auto old_scope = std::exchange(ctx.current_lex_scope, tc_scope.get());
 
         std::vector<std::unique_ptr<parameter>> params;
@@ -86,11 +91,14 @@ inline namespace _v1
         for (auto && param : tc.parameters())
         {
             auto parm = std::make_unique<parameter>(imported_ast_node(ctx, param.range()),
+                ctx.current_lex_scope,
                 utf32(param.name()),
                 get_imported_type_ref_expr(ctx, param.type()));
             tc_scope->init(utf32(param.name()), make_symbol(utf32(param.name()), parm.get()));
             params.push_back(std::move(parm));
         }
+
+        auto old_symbol = ctx.current_symbol;
 
         std::vector<std::unique_ptr<expression>> keepalive;
         keepalive.reserve(tc.overload_sets().size());
@@ -101,14 +109,18 @@ inline namespace _v1
         // to work in the meantime, we'll just avoid using structured bindings here for now
         for (auto && overset : tc.overload_sets())
         {
+            ctx.current_symbol = old_symbol + "." + overset.first;
+
             auto oset = import_overload_set(ctx, overset.second);
-            auto expr = std::make_unique<overload_set_expression>(std::move(oset));
+            auto expr = std::make_unique<overload_set_expression>(
+                std::move(oset), ctx.current_lex_scope, utf32(overset.first));
             tc_scope->init(utf32(overset.first), make_symbol(utf32(overset.first), expr.get()));
             keepalive.push_back(std::move(expr));
         }
 
         tc_scope->close();
         ctx.current_lex_scope = old_scope;
+        ctx.current_symbol = old_symbol;
 
         return std::make_unique<typeclass>(
             imported_ast_node(ctx, tc.range()), std::move(tc_scope), std::move(params), std::move(keepalive));
@@ -142,10 +154,7 @@ inline namespace _v1
     {
         os << styles::def << ctx << styles::type << "typeclass";
         print_address_range(os, this);
-        if (_name)
-        {
-            os << ' ' << styles::string_value << utf8(_name.value());
-        }
+        os << ' ' << styles::string_value << utf8(get_scope()->get_name());
         os << '\n';
 
         if (print_members)
@@ -194,18 +203,6 @@ inline namespace _v1
         return type_info.analysis_future.value();
     }
 
-    void typeclass::set_name(std::u32string name)
-    {
-        assert(!_name);
-        _name = std::move(name);
-    }
-
-    std::u32string typeclass::codegen_name(ir_generation_context &) const
-    {
-        assert(_name || !"typeclasses with no name bound in the frontend are not supported yet!");
-        return _name.value();
-    }
-
     std::unique_ptr<proto::typeclass> typeclass::generate_interface() const
     {
         auto ret = std::make_unique<proto::typeclass>();
@@ -213,7 +210,7 @@ inline namespace _v1
         for (auto && param : _parameters)
         {
             auto parm = ret->add_parameters();
-            parm->set_name(utf8(param->get_name()));
+            parm->set_name(utf8(param->get_name().value()));
             parm->set_allocated_type(param->get_type()->generate_interface_reference().release());
         }
 
@@ -235,27 +232,36 @@ inline namespace _v1
     {
         auto user_defined = std::make_unique<proto::user_defined_reference>();
 
-        for (auto scope : get_scope()->codegen_ir())
+        std::vector<scope *> scope_stack;
+        auto current = get_scope()->parent();
+        while (current)
         {
-            switch (scope.type)
+            scope_stack.push_back(current);
+            current = current->parent();
+        }
+
+        for (auto it = scope_stack.rbegin(); it != scope_stack.rend(); ++it)
+        {
+            auto scope = *it;
+            switch (scope->get_kind())
             {
-                case codegen::ir::scope_type::module:
-                    *user_defined->add_module() = utf8(scope.name);
+                case scope_kind::module:
                     break;
 
-                case codegen::ir::scope_type::type:
-                    assert(!"should probably implement nested UDT references now... ;)");
+                case scope_kind::type:
+                    assert(!"should probably implemented nested UDT references now... ;)");
+
+                case scope_kind::global:
+                    break;
 
                 default:
                     assert(0);
             }
         }
 
-        assert(_name);
-        user_defined->set_name(utf8(_name.value()));
+        user_defined->set_name(utf8(get_scope()->get_entity_name()));
 
         return user_defined;
     }
 }
 }
-

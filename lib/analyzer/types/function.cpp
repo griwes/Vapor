@@ -34,9 +34,10 @@ inline namespace _v1
     function_type::function_type(type * ret, std::vector<type *> params)
         : _return{ ret }, _parameters{ std::move(params) }
     {
-        auto call_operator_params =
-            fmap(_parameters, [&](auto && param_type) { return make_runtime_value(param_type); });
-        call_operator_params.insert(call_operator_params.begin(), make_runtime_value(this));
+        auto call_operator_params = fmap(_parameters,
+            [&](auto && param_type) { return make_runtime_value(param_type, nullptr, std::nullopt); });
+        call_operator_params.insert(
+            call_operator_params.begin(), make_runtime_value(this, nullptr, std::nullopt));
 
         _call_operator = make_function("function type " + function_type::explain() + " call operator");
         _call_operator->set_return_type(_return->get_expression());
@@ -53,7 +54,8 @@ inline namespace _v1
                 auto function = fun_expr->get_value();
                 assert(function);
 
-                auto replacement = make_call_expression(function, nullptr, std::move(args));
+                auto replacement = make_call_expression(
+                    function, nullptr, std::move(args), expr->get_scope(), expr->get_name());
                 auto repl_ptr = replacement.get();
                 expr->replace_with(std::move(replacement));
 

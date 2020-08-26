@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -39,9 +39,12 @@ inline namespace _v1
 {
     std::unique_ptr<struct_type> make_struct_type(precontext & ctx,
         const parser::struct_literal & parse,
-        scope * lex_scope)
+        scope * lex_scope,
+        std::optional<std::u32string> canonical_name)
     {
-        auto member_scope = lex_scope->clone_for_class();
+        assert(canonical_name);
+        auto name = std::move(canonical_name.value());
+        auto member_scope = lex_scope->clone_for_type(std::move(name));
 
         std::vector<std::unique_ptr<declaration>> decls;
 
@@ -73,7 +76,8 @@ inline namespace _v1
 
     std::unique_ptr<struct_type> import_struct_type(precontext & ctx, const proto::struct_type & str)
     {
-        auto member_scope = ctx.current_lex_scope->clone_for_class();
+        auto member_scope = ctx.current_lex_scope->clone_for_type(
+            utf32(ctx.current_symbol).substr(ctx.current_lex_scope->get_scoped_name().size()));
 
         std::vector<std::unique_ptr<declaration>> decls;
 
@@ -127,12 +131,7 @@ inline namespace _v1
 
             auto result = codegen::ir::make_variable(ir_type);
 
-            auto scopes = this->get_scope()->codegen_ir();
-            scopes.emplace_back(get_name(), codegen::ir::scope_type::type);
-
-            codegen::ir::function ret = { U"constructor",
-                std::move(scopes),
-                args,
+            codegen::ir::function ret = { args,
                 result,
                 { codegen::ir::instruction{ std::nullopt,
                       std::nullopt,
@@ -149,41 +148,42 @@ inline namespace _v1
             return ret;
         });
 
-        _aggregate_ctor->set_scopes_generator([this](auto && ctx) { return this->codegen_scopes(ctx); });
+        _aggregate_ctor->set_eval(
+            [this](auto &&, call_expression * call, const std::vector<expression *> & args) {
+                if (!std::equal(
+                        args.begin(), args.end(), _data_members.begin(), [](auto && arg, auto && member) {
+                            return arg->get_type() == member->get_type();
+                        }))
+                {
+                    assert(0);
+                }
 
-        _aggregate_ctor->set_eval([this](auto &&, const std::vector<expression *> & args) {
-            if (!std::equal(args.begin(), args.end(), _data_members.begin(), [](auto && arg, auto && member) {
-                    return arg->get_type() == member->get_type();
-                }))
-            {
-                assert(0);
-            }
+                if (!std::all_of(args.begin(), args.end(), [](auto && arg) { return arg->is_constant(); }))
+                {
+                    return make_ready_future<expression *>(nullptr);
+                }
 
-            if (!std::all_of(args.begin(), args.end(), [](auto && arg) { return arg->is_constant(); }))
-            {
-                return make_ready_future<expression *>(nullptr);
-            }
+                auto repl = replacements{};
+                auto arg_copies = fmap(args, [&](auto && arg) { return repl.claim(arg); });
+                return make_ready_future<expression *>(
+                    make_struct_expression(this->shared_from_this(), std::move(arg_copies)).release());
+            });
 
-            auto repl = replacements{};
-            auto arg_copies = fmap(args, [&](auto && arg) { return repl.claim(arg); });
-            return make_ready_future<expression *>(
-                make_struct_expression(this->shared_from_this(), std::move(arg_copies)).release());
-        });
-
-        _aggregate_ctor->set_name(U"constructor");
+        _aggregate_ctor->set_name(get_scope()->get_entity_name() + U".constructor");
 
         _aggregate_ctor_pair.promise.set(_aggregate_ctor.get());
 
         auto data_members = fmap(_data_members, [&](auto && member) -> std::unique_ptr<expression> {
-            auto param = make_member_expression(this, member->get_name(), member->get_type());
-            auto def_value = make_member_access_expression(member->get_name(), member->get_type());
+            auto param = make_member_expression(this, member->get_name().value(), member->get_type());
+            auto def_value = make_member_access_expression(
+                member->get_name().value(), member->get_type(), get_scope(), member->get_name());
 
             param->set_default_value(def_value.get());
             _default_copy_arguments.push_back(std::move(def_value));
             return param;
         });
 
-        data_members.insert(data_members.begin(), make_runtime_value(this));
+        data_members.insert(data_members.begin(), make_runtime_value(this, nullptr, std::nullopt));
 
         // TODO: this really shouldn't be modelled as a function
         // the default constructor maybe (though not necessarily), but this - definitely not
@@ -198,12 +198,7 @@ inline namespace _v1
             });
             auto result = codegen::ir::make_variable(ir_type);
 
-            auto scopes = this->get_scope()->codegen_ir();
-            scopes.emplace_back(get_name(), codegen::ir::scope_type::type);
-
-            codegen::ir::function ret = { U"replacing_copy_constructor",
-                std::move(scopes),
-                args,
+            codegen::ir::function ret = { args,
                 result,
                 { codegen::ir::instruction{ std::nullopt,
                       std::nullopt,
@@ -220,64 +215,59 @@ inline namespace _v1
             return ret;
         });
 
-        _aggregate_copy_ctor->set_scopes_generator([this](auto && ctx) { return this->codegen_scopes(ctx); });
+        _aggregate_copy_ctor->set_eval(
+            [this](auto &&, call_expression * call, std::vector<expression *> args) {
+                auto base = args.front();
+                args.erase(args.begin());
 
-        _aggregate_copy_ctor->set_eval([this](auto &&, std::vector<expression *> args) {
-            auto base = args.front();
-            args.erase(args.begin());
-
-            if (base->get_type() != this
-                || !std::equal(
-                    args.begin(), args.end(), _data_members.begin(), [](auto && arg, auto && member) {
-                        return arg->get_type() == member->get_type();
-                    }))
-            {
-                logger::default_logger().sync();
-                assert(0);
-            }
-
-            for (auto && arg : args)
-            {
-                if (auto member_arg = arg->as<member_access_expression>())
+                if (base->get_type() != this
+                    || !std::equal(
+                        args.begin(), args.end(), _data_members.begin(), [](auto && arg, auto && member) {
+                            return arg->get_type() == member->get_type();
+                        }))
                 {
-                    auto actual_arg = base->get_member(member_arg->get_name());
-                    arg = actual_arg ? actual_arg : arg;
+                    logger::default_logger().sync();
+                    assert(0);
                 }
-            }
 
-            if (!std::all_of(args.begin(), args.end(), [](auto && arg) { return arg->is_constant(); }))
-            {
-                return make_ready_future<expression *>(nullptr);
-            }
+                for (auto && arg : args)
+                {
+                    if (auto member_arg = arg->as<member_access_expression>())
+                    {
+                        auto actual_arg = base->get_member(member_arg->get_name().value());
+                        arg = actual_arg ? actual_arg : arg;
+                    }
+                }
 
-            auto repl = replacements{};
-            for (std::size_t i = 0; i < _data_members.size(); ++i)
-            {
-                repl.add_replacement(base->get_member(_data_members[i]->get_name()), args[i]);
-            }
-            return make_ready_future(repl.claim(base->_get_replacement()).release());
-        });
+                if (!std::all_of(args.begin(), args.end(), [](auto && arg) { return arg->is_constant(); }))
+                {
+                    return make_ready_future<expression *>(nullptr);
+                }
 
-        _aggregate_copy_ctor->set_name(U"replacing_copy_constructor");
+                auto repl = replacements{};
+                for (std::size_t i = 0; i < _data_members.size(); ++i)
+                {
+                    repl.add_replacement(base->get_member(_data_members[i]->get_name().value()), args[i]);
+                }
+                return make_ready_future(repl.claim(base->_get_replacement()).release());
+            });
+
+        _aggregate_copy_ctor->set_name(get_scope()->get_entity_name() + U".replacing_copy_constructor");
         _aggregate_copy_ctor->make_member();
 
         _aggregate_copy_ctor_pair.promise.set(_aggregate_copy_ctor.get());
     }
 
-    void struct_type::_codegen_type(ir_generation_context & ctx,
+    void struct_type::_codegen_user_type(ir_generation_context & ctx,
         std::shared_ptr<codegen::ir::user_type> actual_type) const
     {
-        auto type = codegen::ir::user_type{ get_name(), get_scope()->codegen_ir(), 0, {} };
+        auto type = codegen::ir::user_type{ get_scope()->get_entity_name(), 0, {} };
 
         auto members = fmap(_data_members,
             [&](auto && member) { return codegen::ir::member{ member->member_codegen_ir(ctx) }; });
 
-        auto scopes = this->get_scope()->codegen_ir();
-        scopes.emplace_back(type.name, codegen::ir::scope_type::type);
-
         auto add_fn = [&](auto && fn) {
             auto fn_ir = fn->codegen_ir(ctx);
-            fn_ir.scopes = scopes;
             fn_ir.parent_type = actual_type;
             members.push_back(codegen::ir::member{ fn_ir });
             ctx.add_generated_function(fn.get());
@@ -305,7 +295,7 @@ inline namespace _v1
         {
             auto proto_member = t->add_data_members();
 
-            proto_member->set_name(utf8(member->get_name()));
+            proto_member->set_name(utf8(member->get_name().value()));
             proto_member->set_allocated_type(member->get_type()->generate_interface_reference().release());
         }
 

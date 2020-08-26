@@ -41,8 +41,10 @@ inline namespace _v1
         : _param_types{ std::move(param_types) },
           _call_operator{ make_function("typeclass type call operator") }
     {
-        auto call_operator_params = fmap(_param_types, [](auto && type) { return make_runtime_value(type); });
-        call_operator_params.insert(call_operator_params.begin(), make_runtime_value(this));
+        auto call_operator_params =
+            fmap(_param_types, [](auto && type) { return make_runtime_value(type, nullptr, std::nullopt); });
+        call_operator_params.insert(
+            call_operator_params.begin(), make_runtime_value(this, nullptr, std::nullopt));
 
         _call_operator->set_return_type(builtin_types().type->get_expression());
         _call_operator->set_parameters(std::move(call_operator_params));

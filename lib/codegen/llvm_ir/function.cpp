@@ -45,16 +45,10 @@ inline namespace _v1
         auto old = ctx.in_function_definition;
         ctx.in_function_definition = true;
 
-        std::u32string scopes;
-        for (auto && scope : fn.scopes)
-        {
-            scopes += scope.name + U".";
-        }
-
         ret += fn.is_defined ? U"define " : U"declare ";
         ret += !fn.is_defined || fn.is_exported ? U"" : U"internal ";
         ret += type_name(ir::get_type(fn.return_value), ctx);
-        ret += U" @\"" + scopes + function_name(fn, ctx);
+        ret += U" @\"" + function_name(fn, ctx);
         ret += U"\"(\n";
         for (auto && param : fn.parameters)
         {
@@ -97,7 +91,7 @@ inline namespace _v1
             ret += U"define i32 @__entry_call_thunk(i32 %arg)\n";
             ret += U"{\n";
             ret += U"entry:\n";
-            ret += U"    %0 = call i32 @\"" + scopes + function_name(fn, ctx) + U"\"(i32 %arg)\n";
+            ret += U"    %0 = call i32 @\"" + function_name(fn, ctx) + U"\"(i32 %arg)\n";
             ret += U"    ret i32 %0\n";
             ret += U"}\n\n";
         }

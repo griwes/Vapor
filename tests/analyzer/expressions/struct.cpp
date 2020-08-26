@@ -85,15 +85,15 @@ MAYFLY_ADD_TESTCASE("constant construction and replacement", [] {
     auto data_members = struct_type->get_data_members();
     MAYFLY_CHECK(data_members.size() == 2);
 
-    integer_constant const_one{ 1 };
-    integer_constant const_two{ 2 };
+    integer_constant const_one{ 1, nullptr, std::nullopt };
+    integer_constant const_two{ 2, nullptr, std::nullopt };
 
     auto struct_expr = current_scope->get(U"bar")->get_expression();
     MAYFLY_CHECK(struct_expr->get_type() == struct_type);
     MAYFLY_REQUIRE(struct_expr->is_constant());
 
-    MAYFLY_CHECK(struct_expr->get_member(data_members[0]->get_name())->is_equal(&const_one));
-    MAYFLY_CHECK(struct_expr->get_member(data_members[1]->get_name())->is_equal(&const_two));
+    MAYFLY_CHECK(struct_expr->get_member(data_members[0]->get_name().value())->is_equal(&const_one));
+    MAYFLY_CHECK(struct_expr->get_member(data_members[1]->get_name().value())->is_equal(&const_two));
 
     // replacement
 
@@ -113,13 +113,13 @@ MAYFLY_ADD_TESTCASE("constant construction and replacement", [] {
         replace_uptr(replaced_expr, reaver::get(replaced_expr->simplify_expr({ simpl_ctx })), simpl_ctx);
     } while (simpl_ctx.did_something_happen());
 
-    integer_constant const_three{ 3 };
+    integer_constant const_three{ 3, nullptr, std::nullopt };
 
     MAYFLY_CHECK(replaced_expr->get_type() == struct_type);
     MAYFLY_REQUIRE(replaced_expr->is_constant());
 
-    MAYFLY_CHECK(replaced_expr->get_member(data_members[0]->get_name())->is_equal(&const_three));
-    MAYFLY_CHECK(replaced_expr->get_member(data_members[1]->get_name())->is_equal(&const_two));
+    MAYFLY_CHECK(replaced_expr->get_member(data_members[0]->get_name().value())->is_equal(&const_three));
+    MAYFLY_CHECK(replaced_expr->get_member(data_members[1]->get_name().value())->is_equal(&const_two));
 
     // designated replacement
 
@@ -143,8 +143,9 @@ MAYFLY_ADD_TESTCASE("constant construction and replacement", [] {
     MAYFLY_CHECK(designated_repl_expr->get_type() == struct_type);
     MAYFLY_REQUIRE(designated_repl_expr->is_constant());
 
-    MAYFLY_CHECK(designated_repl_expr->get_member(data_members[0]->get_name())->is_equal(&const_one));
-    MAYFLY_CHECK(designated_repl_expr->get_member(data_members[1]->get_name())->is_equal(&const_three));
+    MAYFLY_CHECK(designated_repl_expr->get_member(data_members[0]->get_name().value())->is_equal(&const_one));
+    MAYFLY_CHECK(
+        designated_repl_expr->get_member(data_members[1]->get_name().value())->is_equal(&const_three));
 });
 
 MAYFLY_END_SUITE;

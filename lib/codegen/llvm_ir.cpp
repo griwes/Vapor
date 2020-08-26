@@ -82,14 +82,8 @@ inline namespace _v1
 
         if (auto user = dynamic_cast<const ir::user_type *>(type.get()))
         {
-            std::u32string scopes;
-            for (auto && scope : user->scopes)
-            {
-                scopes += scope.name + U".";
-            }
-
             ctx.put_into_global_before += ctx.define_if_necessary(type);
-            return U"%\"" + scopes + user->name + U"\"";
+            return U"%\"" + user->name + U"\"";
         }
 
         assert(!"unsupported type in codegen ir!");
@@ -107,13 +101,7 @@ inline namespace _v1
             var.name = utf32(std::to_string(ctx.unnamed_variable_index++));
         }
 
-        std::u32string scopes;
-        for (auto && scope : var.scopes)
-        {
-            scopes += scope.name + U".";
-        }
-
-        return (ctx.in_function_definition ? U"%\"" : U"@\"") + scopes + var.name.value() + U"\"";
+        return (ctx.in_function_definition ? U"%\"" : U"@\"") + var.name.value() + U"\"";
     }
 
     std::u32string llvm_ir_generator::variable_of(const ir::value & val, codegen_context & ctx)
@@ -190,19 +178,7 @@ inline namespace _v1
 
                     return ret;
                 },
-                [&](const ir::function_value & val) {
-                    std::u32string ret;
-
-                    ret += U"@\"";
-                    for (auto && scope : val.scopes)
-                    {
-                        ret += scope.name + U".";
-                    }
-                    ret += val.name;
-                    ret += U"\"";
-
-                    return ret;
-                },
+                [&](const ir::function_value & val) { return U"@\"" + val.name + U"\""; },
                 [&](auto &&) {
                     assert(0);
                     return unit{};

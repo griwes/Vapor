@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2018-2019 Michał "Griwes" Dominiak
+ * Copyright © 2018-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -55,17 +55,12 @@ inline namespace _v1
 
     bool udr_compare::operator()(const synthesized_udr & lhs, const synthesized_udr & rhs) const
     {
-        return lhs.module == rhs.module && lhs.name == rhs.name;
+        return lhs.name == rhs.name;
     }
 
     std::size_t udr_hash::operator()(const proto::user_defined_reference * udr) const
     {
         std::size_t seed = 0;
-
-        for (auto && module : udr->module())
-        {
-            boost::hash_combine(seed, module);
-        }
 
         boost::hash_combine(seed, udr->name());
 
@@ -76,7 +71,6 @@ inline namespace _v1
     {
         std::size_t seed = 0;
 
-        boost::hash_combine(seed, udr.module);
         boost::hash_combine(seed, udr.name);
 
         return seed;
@@ -86,9 +80,7 @@ inline namespace _v1
         precontext & ctx,
         const proto::user_defined_reference * reference)
         : _reference{ _unresolved_reference{ &ctx,
-            std::unique_ptr<synthesized_udr>{
-                new synthesized_udr{ boost::algorithm::join(reference->module(), "."),
-                    reference->name() } } } }
+            std::unique_ptr<synthesized_udr>{ new synthesized_udr{ reference->name() } } } }
     {
     }
 
@@ -107,8 +99,7 @@ inline namespace _v1
         const proto::user_defined_reference * tc,
         std::vector<std::unique_ptr<expression>> arguments)
         : _reference{ _unresolved_typeclass_instance_type{ &ctx,
-            std::unique_ptr<synthesized_udr>{
-                new synthesized_udr{ boost::algorithm::join(tc->module(), "."), tc->name() } },
+            std::unique_ptr<synthesized_udr>{ new synthesized_udr{ tc->name() } },
             std::move(arguments) } }
     {
     }
@@ -121,8 +112,8 @@ inline namespace _v1
                 auto it = prectx->imported_entities.find(ref);
                 if (it == prectx->imported_entities.end())
                 {
-                    logger::dlog(logger::crash) << "can't find an entity for a user defined reference "
-                                                << ref.module << "." << ref.name << styles::def;
+                    logger::dlog(logger::crash)
+                        << "can't find an entity for a user defined reference " << ref.name << styles::def;
                     logger::default_logger().sync();
                     assert(0);
                 }
@@ -192,7 +183,9 @@ inline namespace _v1
 
     std::unique_ptr<expression> unresolved_type::get_expression()
     {
-        return std::make_unique<unresolved_type_expression>(shared_from_this());
+        // FIXME: the null arguments here are almost certainly a mistake, but right this second I don't know
+        // how to handle them differently
+        return std::make_unique<unresolved_type_expression>(shared_from_this(), nullptr, std::nullopt);
     }
 
     std::unique_ptr<expression> get_imported_type(precontext & ctx, const proto::type & type)
@@ -206,7 +199,6 @@ inline namespace _v1
             {
                 auto ret =
                     std::make_unique<struct_literal>(ast_node{}, import_struct_type(ctx, type.struct_()));
-                ret->set_name(utf32(ctx.current_symbol));
                 return ret;
             }
 
@@ -214,9 +206,8 @@ inline namespace _v1
             {
                 auto oset = import_overload_set(ctx, type.overload_set());
                 auto type = oset->get_type();
-                ctx.imported_overload_sets[{ ctx.module_stack.back(), ctx.current_symbol }] = std::move(oset);
+                ctx.imported_overload_sets[{ ctx.current_symbol }] = std::move(oset);
 
-                type->set_name(utf32(ctx.current_symbol));
                 return make_type_expression(type);
             }
 
@@ -233,11 +224,11 @@ inline namespace _v1
                 switch (type.builtin())
                 {
                     case proto::type_:
-                        return builtin_types().type.get();
+                        return builtin_types().type;
                     case proto::integer:
-                        return builtin_types().integer.get();
+                        return builtin_types().integer;
                     case proto::boolean:
-                        return builtin_types().boolean.get();
+                        return builtin_types().boolean;
 
                     default:
                         assert(0);
@@ -298,7 +289,10 @@ inline namespace _v1
             case proto::type_reference::DetailsCase::kBuiltin:
             case proto::type_reference::DetailsCase::kSizedInt:
                 return make_expression_ref(
-                    std::get<0>(get_imported_type_ref(ctx, reference))->get_expression(), std::nullopt);
+                    std::get<0>(get_imported_type_ref(ctx, reference))->get_expression(),
+                    ctx.global_scope,
+                    std::nullopt,
+                    std::nullopt);
 
             case proto::type_reference::DetailsCase::kUserDefined:
             case proto::type_reference::DetailsCase::kTypeclass:

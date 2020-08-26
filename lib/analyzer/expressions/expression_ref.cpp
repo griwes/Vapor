@@ -33,7 +33,7 @@ inline namespace _v1
 {
     std::unique_ptr<google::protobuf::Message> expression_ref::_generate_interface() const
     {
-        if (get_type() == builtin_types().type.get())
+        if (get_type() == builtin_types().type)
         {
             auto ret = std::make_unique<proto::type>();
             ret->set_allocated_reference(

@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2019 Michał "Griwes" Dominiak
+ * Copyright © 2017-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -58,8 +58,6 @@ inline namespace _v1
         typeclass_instance * get_instance() const;
 
     private:
-        virtual void _set_name(std::u32string name) override;
-
         virtual future<> _analyze(analysis_context & ctx) override;
         virtual future<expression *> _simplify_expr(recursive_context ctx) override;
         virtual std::unique_ptr<expression> _clone_expr(replacements & repl) const override;
@@ -89,6 +87,8 @@ inline namespace _v1
 {
     std::unique_ptr<typeclass_instance_expression> preanalyze_instance_literal(precontext & ctx,
         const parser::instance_literal & tpl,
-        scope * lex_scope);
+        scope * lex_scope,
+        bool is_default,
+        std::optional<std::u32string> canonical_name = std::nullopt);
 }
 }

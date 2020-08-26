@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2015-2018 Michał "Griwes" Dominiak
+ * Copyright © 2015-2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -36,9 +36,19 @@ inline namespace _v1
         return boost::locale::conv::utf_to_utf<char>(utf32);
     }
 
+    inline auto utf8(const std::u32string_view & utf32)
+    {
+        return boost::locale::conv::utf_to_utf<char>(utf32.data());
+    }
+
     inline auto utf32(const std::string & utf8)
     {
         return boost::locale::conv::utf_to_utf<char32_t>(utf8);
+    }
+
+    inline auto utf32(const std::string_view & utf8)
+    {
+        return boost::locale::conv::utf_to_utf<char32_t>(utf8.data());
     }
 }
 }

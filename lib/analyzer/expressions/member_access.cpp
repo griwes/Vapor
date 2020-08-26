@@ -32,9 +32,11 @@ inline namespace _v1
 {
     std::unique_ptr<member_access_expression> preanalyze_member_access_expression(precontext &,
         const parser::member_expression & parse,
-        scope *)
+        scope * lex_scope,
+        std::optional<std::u32string> name)
     {
-        return std::make_unique<member_access_expression>(make_node(parse), parse.member_name.value.string);
+        return std::make_unique<member_access_expression>(
+            make_node(parse), lex_scope, std::move(name), parse.member_name.value.string);
     }
 
     void member_access_expression::print(std::ostream & os, print_context ctx) const
@@ -48,7 +50,7 @@ inline namespace _v1
         {
             os << styles::def << " @ " << styles::address << this << styles::def << ": ";
         }
-        os << styles::string_value << ' ' << utf8(_name) << '\n';
+        os << styles::string_value << ' ' << utf8(_referenced_name) << '\n';
 
         auto type_ctx = ctx.make_branch(true);
         os << styles::def << type_ctx << styles::subrule_name << "referenced member type:\n";
@@ -78,7 +80,7 @@ inline namespace _v1
             // and hence we need to do a Special Thing
             if (top_level->get_lhs() == this && top_level->get_operator() == lexer::token_type::assign)
             {
-                _assignment_expr = make_member_assignment_expression(_name);
+                _assignment_expr = make_member_assignment_expression(_referenced_name);
                 _set_type(_assignment_expr->get_type());
                 return make_ready_future();
             }
@@ -93,10 +95,10 @@ inline namespace _v1
     {
         _base = base;
 
-        auto referenced_type = base->get_type()->get_member_type(_name);
+        auto referenced_type = base->get_type()->get_member_type(_referenced_name);
         assert(referenced_type && "no member found for whatever reason");
 
-        _referenced = base->get_member(_name);
+        _referenced = base->get_member(_referenced_name);
         this->_set_type(referenced_type);
     }
 
@@ -107,13 +109,13 @@ inline namespace _v1
         auto base_variable_value = _base->codegen_ir(ctx).back().result;
         auto base_variable = std::get<std::shared_ptr<codegen::ir::variable>>(base_variable_value);
 
-        auto retvar =
-            codegen::ir::make_variable(_base->get_type()->get_member_type(_name)->codegen_type(ctx));
+        auto retvar = codegen::ir::make_variable(
+            _base->get_type()->get_member_type(_referenced_name)->codegen_type(ctx));
 
         return { codegen::ir::instruction{ std::nullopt,
             std::nullopt,
             { boost::typeindex::type_id<codegen::ir::member_access_instruction>() },
-            { base_variable, codegen::ir::label{ _name } },
+            { base_variable, codegen::ir::label{ _referenced_name } },
             retvar } };
     }
 

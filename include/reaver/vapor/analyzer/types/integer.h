@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -96,14 +96,13 @@ inline namespace _v1
             return ret;
         }
 
-    private:
-        virtual void _codegen_type(ir_generation_context &,
-            std::shared_ptr<codegen::ir::user_type>) const override;
-
-        virtual std::u32string _codegen_name(ir_generation_context & ctx) const override
+        virtual std::u32string codegen_name() const override
         {
             return U"integer";
         }
+
+    private:
+        virtual void _codegen_type(ir_generation_context &) const override;
 
         template<typename Instruction, typename Eval>
         static auto _generate_function(const char32_t * name,

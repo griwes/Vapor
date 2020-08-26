@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2018-2019 Michał "Griwes" Dominiak
+ * Copyright © 2018-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -72,8 +72,7 @@ enum simple_builtin {
 
 message user_defined_reference
 {
-    repeated string module = 1;
-    string name = 2;
+    string name = 1;
 }
 
 message type_reference

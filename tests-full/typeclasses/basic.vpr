@@ -51,13 +51,23 @@ module main
         }
     };
 
+    let identity = instance algorithm(int32)
+    {
+        function calculate(arg)
+        {
+            return arg;
+        }
+    };
+
     let entry = λ(arg : int32) -> int32
     {
         let not_wrapped = factorial.calculate(5);
         let wrapped = wrapped_factorial.calculate(wrapped_int32{ arg });
 
+        let arg_through_identity = identity.calculate(arg);
+
         let indirect = wrapped_factorial.indirection(wrapped_int32{ 5 });
-        let runtime_indirect = factorial.indirection(arg);
+        let runtime_indirect = factorial.indirection(arg_through_identity);
 
         return not_wrapped - wrapped.x + indirect.x - runtime_indirect;
     };

@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2018 Michał "Griwes" Dominiak
+ * Copyright © 2017-2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -59,7 +59,7 @@ MAYFLY_ADD_TESTCASE("init and get", [] {
 
 MAYFLY_ADD_TESTCASE("resolve", [] {
     scope parent;
-    auto child = parent.clone_for_class();
+    auto child = parent.clone_for_type(U"child");
 
     auto parent_only = make_symbol(U"parent_only");
     auto parent_only_ptr = parent_only.get();
@@ -81,7 +81,7 @@ MAYFLY_ADD_TESTCASE("resolve", [] {
     auto overloaded_symbol = child->resolve(U"overloaded");
     MAYFLY_CHECK_THROWS_TYPE(failed_lookup, child->resolve(U"failed"));
 
-    auto grandchild = child->clone_for_class();
+    auto grandchild = child->clone_for_type(U"grandchild");
 
     auto grandchild_symbol = grandchild->resolve(U"parent_only");
 
@@ -97,27 +97,28 @@ MAYFLY_ADD_TESTCASE("is_local", [] {
     auto s2 = s1.clone_for_decl();
     MAYFLY_CHECK(&s1 == s2);
 
-    auto s3 = s1.clone_local(); // is_local = true
+    auto s3 = s1.clone_for_local(); // is_local = true
     std::unique_ptr<scope> s4{ s3->clone_for_decl() };
     MAYFLY_CHECK(s3.get() != s4.get());
 
-    auto s5 = s1.clone_for_class(); // is_local = false
+    auto s5 = s1.clone_for_type(U"child"); // is_local = false
     auto s6 = s5->clone_for_decl();
     MAYFLY_CHECK(s5.get() == s6);
 });
 
 MAYFLY_ADD_TESTCASE("shadowing boundary", [] {
-    scope s1{ true }; // is_shadowing_boundary = false
+    scope s0;
+    auto s1 = s0.clone_for_local(); // is_shadowing_boundary = true
 
-    s1.init(U"symbol", make_symbol(U"symbol"));
+    s1->init(U"symbol", make_symbol(U"symbol"));
 
-    std::unique_ptr<scope> s2{ s1.clone_for_decl() }; // is_shadowing_boundary = false
+    std::unique_ptr<scope> s2{ s1->clone_for_decl() }; // is_shadowing_boundary = false
     MAYFLY_CHECK(!s2->init(U"symbol", make_symbol(U"symbol")));
 
-    auto s3 = s1.clone_local(); // is_shadowing_boundary = true
+    auto s3 = s1->clone_for_local(); // is_shadowing_boundary = true
     MAYFLY_CHECK(s3->init(U"symbol", make_symbol(U"symbol")));
 
-    auto s4 = s1.clone_for_class(); // is_shadowing_boundary = true
+    auto s4 = s1->clone_for_type(U"s4"); // is_shadowing_boundary = true
     MAYFLY_CHECK(s4->init(U"symbol", make_symbol(U"symbol")));
 });
 

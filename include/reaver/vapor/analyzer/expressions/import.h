@@ -41,8 +41,11 @@ inline namespace _v1
     class import_expression : public expression
     {
     public:
-        import_expression(ast_node node, entity * module)
-            : expression{ module->get_type() }, _module{ module }
+        import_expression(ast_node node,
+            entity * module,
+            scope * lex_scope,
+            std::optional<std::u32string> name)
+            : expression{ module->get_type(), lex_scope, std::move(name) }, _module{ module }
         {
             _set_ast_info(node);
         }
@@ -101,6 +104,7 @@ inline namespace _v1
     std::unique_ptr<import_expression> preanalyze_import(precontext & ctx,
         const parser::import_expression & parse,
         scope * lex_scope,
+        std::optional<std::u32string> name,
         import_mode mode = import_mode::expression);
 }
 }

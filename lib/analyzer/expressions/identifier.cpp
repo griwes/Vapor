@@ -31,7 +31,7 @@ inline namespace _v1
     {
         os << styles::def << ctx << styles::rule_name << "identifier";
         print_address_range(os, this);
-        os << ' ' << styles::string_value << utf8(_name) << '\n';
+        os << ' ' << styles::string_value << utf8(_referenced_name) << '\n';
 
         auto expr_ctx = ctx.make_branch(!try_get_type());
         os << styles::def << expr_ctx << styles::subrule_name << "referenced expression";
@@ -47,7 +47,8 @@ inline namespace _v1
 
     future<> identifier::_analyze(analysis_context & ctx)
     {
-        return _lex_scope->resolve(_name)
+        return get_scope()
+            ->resolve(_referenced_name)
             ->get_expression_future()
             .then([&, this](auto && expression) {
                 _referenced = expression;

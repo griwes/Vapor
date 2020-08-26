@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2019 Michał "Griwes" Dominiak
+ * Copyright © 2019-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -84,15 +84,11 @@ inline namespace _v1
 
         void print(std::ostream & os, print_context ctx, bool print_members = false) const;
 
-        void set_name(std::u32string name);
-        std::u32string codegen_name(ir_generation_context &) const;
-
         std::unique_ptr<proto::typeclass> generate_interface() const;
         std::unique_ptr<proto::user_defined_reference> generate_interface_reference() const;
 
     private:
         ast_node _parse;
-        std::optional<std::u32string> _name;
 
         std::unique_ptr<scope> _scope;
         std::vector<std::unique_ptr<parameter>> _parameters;
@@ -130,7 +126,8 @@ inline namespace _v1
 
     std::unique_ptr<typeclass> make_typeclass(precontext & ctx,
         const parser::typeclass_literal & parse,
-        scope * lex_scope);
+        scope * lex_scope,
+        std::optional<std::u32string> canonical_name = std::nullopt);
     std::unique_ptr<typeclass> import_typeclass(precontext & ctx, const proto::typeclass &);
 }
 }

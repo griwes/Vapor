@@ -46,7 +46,7 @@ MAYFLY_ADD_TESTCASE("empty struct", [] {
 
     auto ast = parse(U"struct {}", parser::parse_struct_literal);
 
-    auto struct_lit = preanalyze_struct_literal(pctx, ast, current_scope);
+    auto struct_lit = preanalyze_struct_literal(pctx, ast, current_scope, U"placeholder");
 
     reaver::get(struct_lit->analyze(ctx));
 
@@ -87,7 +87,7 @@ MAYFLY_ADD_TESTCASE("struct with members", [] {
         )code",
         parser::parse_struct_literal);
 
-    auto struct_lit = preanalyze_struct_literal(pctx, ast, current_scope);
+    auto struct_lit = preanalyze_struct_literal(pctx, ast, current_scope, U"placeholder");
 
     reaver::get(struct_lit->analyze(ctx));
 

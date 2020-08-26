@@ -121,7 +121,7 @@ inline namespace _v1
         return future.then([&]() -> statement * {
             if (_condition->is_constant())
             {
-                if (_condition->get_type() != builtin_types().boolean.get())
+                if (_condition->get_type() != builtin_types().boolean)
                 {
                     assert(0);
                 }

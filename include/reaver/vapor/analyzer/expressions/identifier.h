@@ -37,15 +37,18 @@ inline namespace _v1
     class identifier : public expression_ref
     {
     public:
-        identifier(std::u32string name, scope * lex_scope, ast_node parse_info)
-            : _lex_scope{ lex_scope }, _name{ std::move(name) }
+        identifier(std::u32string referenced_name,
+            scope * lex_scope,
+            std::optional<std::u32string> name,
+            ast_node parse_info)
+            : expression_ref{ lex_scope, std::move(name) }, _referenced_name{ std::move(referenced_name) }
         {
             _set_ast_info(parse_info);
         }
 
         const std::u32string & name() const
         {
-            return _name;
+            return _referenced_name;
         }
 
         virtual void print(std::ostream & os, print_context ctx) const override;
@@ -53,17 +56,17 @@ inline namespace _v1
     private:
         virtual future<> _analyze(analysis_context &) override;
 
-        scope * _lex_scope;
-        std::u32string _name;
+        std::u32string _referenced_name;
     };
 
     struct precontext;
 
     inline std::unique_ptr<identifier> preanalyze_identifier(precontext &,
         const parser::identifier & parse,
-        scope * lex_scope)
+        scope * lex_scope,
+        std::optional<std::u32string> name = std::nullopt)
     {
-        return std::make_unique<identifier>(parse.value.string, lex_scope, make_node(parse));
+        return std::make_unique<identifier>(parse.value.string, lex_scope, std::move(name), make_node(parse));
     }
 }
 }

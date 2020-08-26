@@ -59,10 +59,15 @@ inline namespace _v1
     class expression : public statement
     {
     public:
-        expression() = default;
         virtual ~expression() = default;
 
-        expression(type * t) : _type{ t }
+        expression(scope * lex_scope, std::optional<std::u32string> name)
+            : _lex_scope{ lex_scope }, _name{ std::move(name) }
+        {
+        }
+
+        expression(type * t, scope * lex_scope, std::optional<std::u32string> name)
+            : _type{ t }, _lex_scope{ lex_scope }, _name{ std::move(name) }
         {
         }
 
@@ -90,19 +95,7 @@ inline namespace _v1
         }
 
     public:
-        future<expression *> simplify_expr(recursive_context ctx)
-        {
-            return ctx.proper.get_future_or_init(this, [&]() {
-                return make_ready_future()
-                    .then([this, ctx]() { return _simplify_expr(ctx); })
-                    .then([this](auto && expr) {
-                        logger::dlog(logger::trace)
-                            << "Simplified " << this << " (" << typeid(*this).name() << ") to " << expr
-                            << " (" << (expr ? typeid(*expr).name() : "?") << ")";
-                        return expr;
-                    });
-            });
-        }
+        future<expression *> simplify_expr(recursive_context ctx);
 
         void set_context(expression_context ctx)
         {
@@ -125,95 +118,27 @@ inline namespace _v1
             _default_value = expr;
         }
 
-        virtual bool is_constant() const
+        virtual bool is_constant() const;
+        bool is_equal(const expression * rhs) const;
+        bool is_different_constant(const expression * rhs);
+        virtual std::unique_ptr<expression> convert_to(type * target) const;
+        virtual bool is_member() const;
+        virtual bool is_member_assignment() const;
+        virtual bool is_member_access() const;
+        virtual expression * get_member(const std::u32string & name) const;
+        virtual function * get_vtable_entry(std::size_t) const;
+
+        const std::optional<std::u32string> & get_name() const
         {
-            auto repl = _get_replacement();
-            assert(repl);
-            return repl != this && repl->is_constant();
+            return _name;
         }
 
-        bool is_equal(const expression * rhs) const
+        scope * get_scope() const
         {
-            if (this == rhs && _is_pure())
-            {
-                return true;
-            }
-
-            if (_is_equal(rhs) || rhs->_is_equal(this))
-            {
-                return true;
-            }
-
-            auto this_replacement = _get_replacement();
-            auto rhs_replacement = rhs->_get_replacement();
-            if (this != this_replacement || rhs != rhs_replacement)
-            {
-                return this_replacement->_is_equal(rhs_replacement)
-                    || rhs_replacement->_is_equal(this_replacement);
-            }
-
-            return false;
+            return _lex_scope;
         }
 
-        bool is_different_constant(const expression * rhs)
-        {
-            bool is_c = is_constant();
-
-            if (is_c ^ rhs->is_constant())
-            {
-                return true;
-            }
-
-            return is_c && !is_equal(rhs);
-        }
-
-        virtual std::unique_ptr<expression> convert_to(type * target) const
-        {
-            if (get_type() == target)
-            {
-                assert(0); // I don't know whether I want to support this
-            }
-
-            auto repl = _get_replacement();
-            if (repl == this)
-            {
-                return nullptr;
-            }
-
-            return repl->convert_to(target);
-        }
-
-        virtual bool is_member() const
-        {
-            return false;
-        }
-
-        virtual bool is_member_assignment() const
-        {
-            auto repl = _get_replacement();
-            return repl != this && repl->is_member_assignment();
-        }
-
-        virtual bool is_member_access() const
-        {
-            return false;
-        }
-
-        virtual expression * get_member(const std::u32string & name) const
-        {
-            auto repl = _get_replacement();
-            if (repl == this)
-            {
-                return nullptr;
-            }
-
-            return repl->get_member(name);
-        }
-
-        virtual function * get_vtable_entry(std::size_t) const
-        {
-            return nullptr;
-        }
+        std::optional<std::u32string_view> get_entity_name() const;
 
         template<typename T>
         T * as()
@@ -259,28 +184,6 @@ inline namespace _v1
             return {};
         }
 
-        void set_name(std::u32string name)
-        {
-            _name = name;
-            _set_name(std::move(name));
-        }
-
-        bool has_entity_name() const
-        {
-            return _name.has_value();
-        }
-
-        const std::u32string & get_entity_name() const
-        {
-            if (!_name)
-            {
-                throw exception{ logger::crash }
-                    << "tried to get the entity name of an unnamed object of type " << typeid(*this).name()
-                    << " @ " << this;
-            }
-            return _name.value();
-        }
-
         virtual void mark_exported()
         {
         }
@@ -298,61 +201,29 @@ inline namespace _v1
             _type = t;
         }
 
-        virtual void _set_name(std::u32string)
+        void _set_scope(scope * s)
         {
+            assert(!_lex_scope);
+            _lex_scope = s;
         }
 
-        virtual future<> _analyze(analysis_context &) override
-        {
-            assert(_type);
-            return make_ready_future();
-        }
-
-        virtual std::unique_ptr<statement> _clone(replacements & repl) const final
-        {
-            return _clone_expr(repl);
-        }
-
+        virtual std::optional<std::u32string> _get_entity_name() const;
+        virtual future<> _analyze(analysis_context &) override;
+        virtual std::unique_ptr<statement> _clone(replacements & repl) const final;
         virtual std::unique_ptr<expression> _clone_expr(replacements & repl) const = 0;
-
-        virtual future<statement *> _simplify(recursive_context ctx) override final
-        {
-            return simplify_expr(ctx).then([&](auto && simplified) -> statement * { return simplified; });
-        }
-
-        virtual future<expression *> _simplify_expr(recursive_context)
-        {
-            return make_ready_future(this);
-        }
-
+        virtual future<statement *> _simplify(recursive_context ctx) override final;
+        virtual future<expression *> _simplify_expr(recursive_context);
         virtual constant_init_ir _constinit_ir(ir_generation_context & ctx) const = 0;
-
-        virtual bool _is_equal([[maybe_unused]] const expression * expr) const
-        {
-            return false;
-        }
-
-        bool _is_pure() const
-        {
-            return true;
-        }
-
-        virtual std::unique_ptr<google::protobuf::Message> _generate_interface() const
-        {
-            auto replacement = _get_replacement();
-
-            if (this == replacement)
-            {
-                assert(0);
-            }
-
-            return replacement->_generate_interface();
-        }
+        virtual bool _is_equal([[maybe_unused]] const expression * expr) const;
+        virtual bool _is_pure() const;
+        virtual std::unique_ptr<google::protobuf::Message> _generate_interface() const;
 
     private:
         type * _type = nullptr;
         expression * _default_value = nullptr;
+        scope * _lex_scope = nullptr;
         std::optional<std::u32string> _name;
+        mutable std::optional<std::u32string> _entity_name; // this is computed and cached
 
         expression_context _expr_ctx;
     };
@@ -363,6 +234,15 @@ inline namespace _v1
     }
 
     future<expression *> simplification_loop(analysis_context & ctx, std::unique_ptr<expression> & uptr);
+
+    template<typename... Ts>
+    std::vector<std::unique_ptr<expression>> unique_expr_list(Ts &&... ts)
+    {
+        std::vector<std::unique_ptr<expression>> ret;
+        ret.reserve(sizeof...(ts));
+        (ret.emplace_back(std::forward<Ts>(ts)), ...);
+        return ret;
+    }
 }
 }
 
@@ -380,6 +260,7 @@ inline namespace _v1
     struct precontext;
     std::unique_ptr<expression> preanalyze_expression(precontext & ctx,
         const parser::expression & expr,
-        scope * lex_scope);
+        scope * lex_scope,
+        std::optional<std::u32string> canonical_name = std::nullopt);
 }
 }

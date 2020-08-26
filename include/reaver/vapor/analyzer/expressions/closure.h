@@ -42,7 +42,9 @@ inline namespace _v1
             std::unique_ptr<scope> sc,
             parameter_list params,
             std::unique_ptr<block> body,
-            std::optional<std::unique_ptr<expression>> return_type);
+            std::optional<std::unique_ptr<expression>> return_type,
+            scope * lex_scope,
+            std::optional<std::u32string> name);
 
         virtual void print(std::ostream & os, print_context ctx) const override;
 
@@ -85,6 +87,7 @@ inline namespace _v1
     struct precontex;
     std::unique_ptr<closure> preanalyze_closure(precontext & ctx,
         const parser::lambda_expression & parse,
-        scope * lex_scope);
+        scope * lex_scope,
+        std::optional<std::u32string> name);
 }
 }

@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -54,13 +54,17 @@ inline namespace _v1
         return ret;
     }
 
-    overload_set_expression::overload_set_expression(scope * lex_scope)
-        : _oset{ std::make_unique<overload_set>(lex_scope) }
+    overload_set_expression::overload_set_expression(scope * lex_scope, std::u32string name)
+        : overload_set_expression_base{ lex_scope, name },
+          _oset{ std::make_unique<overload_set>(lex_scope->clone_for_type(U"oset$" + name)) }
     {
         _set_type(_oset->get_type());
     }
 
-    overload_set_expression::overload_set_expression(std::shared_ptr<overload_set> t) : _oset{ std::move(t) }
+    overload_set_expression::overload_set_expression(std::shared_ptr<overload_set> t,
+        scope * lex_scope,
+        std::u32string name)
+        : overload_set_expression_base{ lex_scope, std::move(name) }, _oset{ std::move(t) }
     {
         _set_type(_oset->get_type());
     }
@@ -74,13 +78,18 @@ inline namespace _v1
 
     std::unique_ptr<expression> overload_set_expression::_clone_expr(replacements & repl) const
     {
-        return std::make_unique<overload_set_expression>(_oset);
+        return std::make_unique<overload_set_expression>(_oset, get_scope(), get_name().value());
     }
 
     statement_ir overload_set_expression::_codegen_ir(ir_generation_context & ctx) const
     {
+        // assert(0); // this function looks _really_ wrong
+        assert(get_type()->get_scope());
         auto var = codegen::ir::make_variable(get_type()->codegen_type(ctx));
-        var->scopes = get_type()->get_scope()->codegen_ir();
+        if (get_name())
+        {
+            var->name = _oset->get_name();
+        }
         return { codegen::ir::instruction{ std::nullopt,
             std::nullopt,
             { boost::typeindex::type_id<codegen::ir::pass_value_instruction>() },
@@ -108,14 +117,19 @@ inline namespace _v1
     }
 
     refined_overload_set_expression::refined_overload_set_expression(
-        std::shared_ptr<refined_overload_set> oset)
-        : _oset{ std::move(oset) }
+        std::shared_ptr<refined_overload_set> oset,
+        scope * lex_scope,
+        std::u32string name)
+        : overload_set_expression_base{ lex_scope, std::move(name) }, _oset{ std::move(oset) }
     {
         _set_type(_oset->get_type());
     }
 
-    refined_overload_set_expression::refined_overload_set_expression(overload_set * base)
-        : _oset{ std::make_unique<refined_overload_set>(base) }
+    refined_overload_set_expression::refined_overload_set_expression(overload_set * base,
+        scope * lex_scope,
+        std::u32string name)
+        : overload_set_expression_base{ lex_scope, std::move(name) },
+          _oset{ std::make_unique<refined_overload_set>(lex_scope, base) }
     {
         _set_type(_oset->get_type());
     }
@@ -132,7 +146,7 @@ inline namespace _v1
 
     std::unique_ptr<expression> refined_overload_set_expression::_clone_expr(replacements &) const
     {
-        return std::make_unique<refined_overload_set_expression>(_oset);
+        return std::make_unique<refined_overload_set_expression>(_oset, get_scope(), get_name().value());
     }
 
     statement_ir refined_overload_set_expression::_codegen_ir(ir_generation_context & ctx) const
@@ -180,11 +194,9 @@ inline namespace _v1
             auto type_name = U"oset$" + name;
 
             auto oset = create();
-            oset->set_name(name);
             lex_scope->init(name, make_symbol(name, oset.get()));
 
             auto type = oset->get_type();
-            type->set_name(type_name);
             lex_scope->init(type_name, make_symbol(type_name, type->get_expression()));
 
             return oset;
@@ -194,15 +206,16 @@ inline namespace _v1
     std::unique_ptr<overload_set_expression> create_overload_set(scope * lex_scope, std::u32string name)
     {
         return _detail::create_overload_set(
-            lex_scope, name, [&] { return std::make_unique<overload_set_expression>(lex_scope); });
+            lex_scope, name, [&] { return std::make_unique<overload_set_expression>(lex_scope, name); });
     }
 
     std::unique_ptr<refined_overload_set_expression> create_refined_overload_set(scope * lex_scope,
         std::u32string name,
         overload_set * base)
     {
-        return _detail::create_overload_set(
-            lex_scope, name, [&] { return std::make_unique<refined_overload_set_expression>(base); });
+        return _detail::create_overload_set(lex_scope, name, [&] {
+            return std::make_unique<refined_overload_set_expression>(base, lex_scope, name);
+        });
     }
 
     namespace _detail
@@ -275,16 +288,21 @@ inline namespace _v1
     }
 
     unresolved_overload_set_expression::unresolved_overload_set_expression(precontext & ctx,
-        const proto::user_defined_reference * udr)
-        : _ctx{ &ctx }, _udr{ boost::algorithm::join(udr->module(), "."), udr->name() }
+        const proto::user_defined_reference * udr,
+        scope * lex_scope)
+        : overload_set_expression_base{ lex_scope,
+              utf32(udr->name()).substr(lex_scope->get_scoped_name().size()) },
+          _ctx{ &ctx },
+          _udr{ udr->name() }
     {
+        logger::dlog() << "uhhh: " << utf8(get_name().value()) << ", " << utf8(lex_scope->get_scoped_name());
     }
 
     future<> unresolved_overload_set_expression::_analyze(analysis_context &)
     {
         auto && oset = _ctx->imported_overload_sets[_udr];
         assert(oset);
-        _resolved = std::make_unique<overload_set_expression>(oset);
+        _resolved = std::make_unique<overload_set_expression>(oset, get_scope(), get_name().value());
         _set_type(oset->get_type());
 
         return make_ready_future();
@@ -328,9 +346,10 @@ inline namespace _v1
 
     std::unique_ptr<unresolved_overload_set_expression> make_unresolved_overload_set_expression(
         precontext & ctx,
-        const proto::user_defined_reference * udr)
+        const proto::user_defined_reference * udr,
+        scope * lex_scope)
     {
-        return std::make_unique<unresolved_overload_set_expression>(ctx, udr);
+        return std::make_unique<unresolved_overload_set_expression>(ctx, udr, lex_scope);
     }
 }
 }

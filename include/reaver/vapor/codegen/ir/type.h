@@ -29,7 +29,6 @@
 #include <reaver/variant.h>
 
 #include "function.h"
-#include "scope.h"
 
 namespace reaver::vapor::codegen
 {
@@ -63,14 +62,8 @@ inline namespace _v1
 
         struct user_type : type
         {
-            user_type(std::u32string name = {},
-                std::vector<scope> scopes = {},
-                std::size_t size = {},
-                std::vector<member> members = {})
-                : name{ std::move(name) },
-                  scopes{ std::move(scopes) },
-                  size{ size },
-                  members{ std::move(members) }
+            user_type(std::u32string name = {}, std::size_t size = {}, std::vector<member> members = {})
+                : name{ std::move(name) }, size{ size }, members{ std::move(members) }
             {
             }
 
@@ -82,7 +75,6 @@ inline namespace _v1
             user_type & operator=(const user_type &) = default;
 
             std::u32string name;
-            std::vector<scope> scopes;
             std::size_t size;
             std::vector<member> members;
         };

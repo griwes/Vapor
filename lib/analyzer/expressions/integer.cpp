@@ -36,7 +36,8 @@ inline namespace _v1
         {
             if (_value <= sized_target->max_value() && _value >= sized_target->min_value())
             {
-                return std::make_unique<sized_integer_constant>(sized_target, _value);
+                return std::make_unique<sized_integer_constant>(
+                    sized_target, _value, get_scope(), std::nullopt);
             }
         }
 

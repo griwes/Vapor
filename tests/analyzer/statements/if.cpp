@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2018 Michał "Griwes" Dominiak
+ * Copyright © 2017-2019 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -123,7 +123,7 @@ MAYFLY_ADD_TESTCASE("two branches, true", [] {
     replace_uptr(if_stmt, reaver::get(simpl_future), simpl_ctx);
     MAYFLY_REQUIRE(if_stmt.get() != if_stmt_ptr);
 
-    integer_constant constant{ 0 };
+    integer_constant constant{ 0, nullptr, std::nullopt };
 
     auto returns = if_stmt->get_returns();
     MAYFLY_REQUIRE(returns.size() == 1);
@@ -156,7 +156,7 @@ MAYFLY_ADD_TESTCASE("two branches, false", [] {
     replace_uptr(if_stmt, reaver::get(simpl_future), simpl_ctx);
     MAYFLY_REQUIRE(if_stmt.get() != if_stmt_ptr);
 
-    integer_constant constant{ 1 };
+    integer_constant constant{ 1, nullptr, std::nullopt };
 
     auto returns = if_stmt->get_returns();
     MAYFLY_REQUIRE(returns.size() == 1);
@@ -170,7 +170,7 @@ MAYFLY_ADD_TESTCASE("runtime condition", [] {
 
     scope s;
     auto current_scope = &s;
-    test_expression expr{ builtin_types().boolean.get() };
+    test_expression expr{ builtin_types().boolean };
     expr.set_simplified_expression(std::unique_ptr<expression>{ &expr });
     s.init(U"condition", make_symbol(U"condition", &expr));
     s.close();

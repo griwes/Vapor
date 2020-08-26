@@ -1,0 +1,19 @@
+// compile: {vprc} {input} -I {directory}/imports -l -a -c
+// link: {cc} {runtime} {input}.o {directory}/imports/export_default.vpr.o -o {input}.bin
+// run: {input}.bin 1
+
+import export_default;
+
+module main
+{
+    let int32 = sized_int(32);
+
+    let entry = λ(arg : int32) {
+        let a = default(export_default.tc(int32)).with_default(arg);
+        let b = default(export_default.tc(int32)).without_default(arg);
+
+        return a + b;
+    };
+}
+
+// vim: filetype=cpp

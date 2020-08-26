@@ -60,7 +60,7 @@ inline namespace _v1
             }();
 
             auto param = std::make_unique<parameter>(
-                make_node(param_parse), param_parse.name.value.string, std::move(type));
+                make_node(param_parse), lex_scope, param_parse.name.value.string, std::move(type));
 
             auto symb = make_symbol(param_parse.name.value.string, param.get());
             lex_scope->init(param_parse.name.value.string, std::move(symb));
@@ -70,8 +70,11 @@ inline namespace _v1
         });
     }
 
-    parameter::parameter(ast_node parse, std::u32string name, std::unique_ptr<expression> type)
-        : _name{ std::move(name) }, _type_expression{ std::move(type) }
+    parameter::parameter(ast_node parse,
+        scope * lex_scope,
+        std::u32string name,
+        std::unique_ptr<expression> type)
+        : expression{ lex_scope, std::move(name) }, _type_expression{ std::move(type) }
     {
         _set_ast_info(parse);
     }
@@ -82,7 +85,7 @@ inline namespace _v1
     {
         os << styles::def << ctx << styles::rule_name << "parameter";
         print_address_range(os, this);
-        os << ' ' << styles::string_value << utf8(_name) << '\n';
+        os << ' ' << styles::string_value << utf8(get_name().value()) << '\n';
 
         auto type_expr_ctx = ctx.make_branch(true);
         os << styles::def << type_expr_ctx << styles::subrule_name << "type expression:\n";
@@ -125,7 +128,7 @@ inline namespace _v1
             auto type = type_value->get_value();
             if (type->is_meta())
             {
-                _archetype = type->generate_archetype(get_ast_info().value(), _name);
+                _archetype = type->generate_archetype(get_ast_info().value(), get_name().value());
             }
 
             this->_set_type(type);
@@ -145,7 +148,8 @@ inline namespace _v1
     {
         auto new_type = repl.try_get_replacement(get_type());
         return std::make_unique<parameter>(get_ast_info().value(),
-            _name,
+            get_scope(),
+            get_name().value(),
             new_type ? repl.copy_claim(new_type->get_expression()) : repl.claim(_type_expression.get()));
     }
 

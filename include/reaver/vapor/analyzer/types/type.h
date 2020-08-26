@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -63,45 +63,16 @@ inline namespace _v1
     class type
     {
     public:
-        type() : _member_scope{ std::make_unique<scope>() }
-        {
-            _init_expr();
-            _init_pack_type();
-        }
-
-        type(scope * outer_scope) : _member_scope{ outer_scope->clone_for_class() }
-        {
-            _init_expr();
-            _init_pack_type();
-        }
-
-        type(std::unique_ptr<scope> member_scope) : _member_scope{ std::move(member_scope) }
-        {
-            _init_expr();
-            _init_pack_type();
-        }
-
         static constexpr struct dont_init_expr_t
         {
         } dont_init_expr{};
 
-        type(dont_init_expr_t, std::unique_ptr<scope> lex_scope = std::make_unique<scope>())
-            : _member_scope{ std::move(lex_scope) }
-        {
-        }
+        type();
+        type(dont_init_expr_t);
+        type(std::unique_ptr<scope> member_scope);
+        type(dont_init_expr_t, std::unique_ptr<scope> lex_scope);
 
-        void init_expr()
-        {
-            if (!_self_expression)
-            {
-                if (!_expression_initialization)
-                {
-                    _expression_initialization = true;
-                    _init_expr();
-                    _init_pack_type();
-                }
-            }
-        }
+        void init_expr();
 
     protected:
         // this is virtually only for `pack_type`
@@ -110,28 +81,14 @@ inline namespace _v1
         {
         } dont_init_pack{};
 
-        type(dont_init_pack_t) : _member_scope{ std::make_unique<scope>() }
-        {
-            _init_expr();
-        }
-
-        type(scope * outer_scope, dont_init_pack_t) : _member_scope{ outer_scope->clone_for_class() }
-        {
-            _init_expr();
-        }
+        type(dont_init_pack_t);
 
     public:
         virtual ~type();
 
-        virtual future<std::vector<function *>> get_candidates(lexer::token_type) const
-        {
-            return make_ready_future(std::vector<function *>{});
-        }
-
-        virtual future<function *> get_constructor(std::vector<const expression *>) const
-        {
-            return make_ready_future(static_cast<function *>(nullptr));
-        }
+        virtual future<std::vector<function *>> get_candidates(lexer::token_type) const;
+        virtual future<function *> get_constructor(std::vector<const expression *>) const;
+        virtual type * get_member_type(const std::u32string &) const;
 
         virtual std::string explain() const = 0;
         virtual void print(std::ostream & os, print_context ctx) const = 0;
@@ -141,79 +98,31 @@ inline namespace _v1
             return _member_scope.get();
         }
 
-        virtual type * get_member_type(const std::u32string &) const
-        {
-            return nullptr;
-        }
-
         std::shared_ptr<codegen::ir::type> codegen_type(ir_generation_context & ctx) const
         {
             if (!_codegen_t)
             {
-                auto user_type = std::make_shared<codegen::ir::user_type>();
-                user_type->scopes = _member_scope->codegen_ir();
-                _codegen_t = user_type;
-                _codegen_type(ctx, std::move(user_type));
+                _codegen_type(ctx);
             }
-
             return *_codegen_t;
         }
 
         expression * get_expression() const;
 
-        virtual type * get_pack_type() const
-        {
-            assert(_pack_type);
-            return _pack_type.get();
-        }
+        virtual type * get_pack_type() const;
+        virtual bool matches(type * other) const;
+        virtual bool matches(const std::vector<type *> & types) const;
+        virtual bool needs_conversion(type * other) const;
+        virtual bool is_meta() const;
+        virtual std::unique_ptr<archetype> generate_archetype(ast_node node, std::u32string param_name) const;
 
-        virtual bool matches(type * other) const
-        {
-            return this == other;
-        }
-
-        virtual bool matches(const std::vector<type *> & types) const
-        {
-            return false;
-        }
-
-        virtual bool needs_conversion(type * other) const
-        {
-            return false;
-        }
-
-        virtual bool is_meta() const
-        {
-            return false;
-        }
-
-        virtual std::unique_ptr<archetype> generate_archetype(ast_node node, std::u32string param_name) const
-        {
-            assert(!is_meta() && "default generate_archetype hit, even though is_meta() is true");
-            assert(!"generate_archetype invoked on a non-meta type");
-        }
-
-        std::vector<codegen::ir::scope> codegen_scopes(ir_generation_context & ctx) const
-        {
-            auto base_scopes = _member_scope->codegen_ir();
-            base_scopes.push_back(codegen::ir::scope{ _codegen_name(ctx), codegen::ir::scope_type::type });
-            return base_scopes;
-        }
-
-        const std::u32string & get_name() const
-        {
-            return _name;
-        }
-
-        void set_name(std::u32string name);
+        virtual std::u32string codegen_name() const = 0;
 
         virtual std::unique_ptr<proto::type> generate_interface() const = 0;
         virtual std::unique_ptr<proto::type_reference> generate_interface_reference() const = 0;
 
     private:
-        virtual void _codegen_type(ir_generation_context &,
-            std::shared_ptr<codegen::ir::user_type>) const = 0;
-        virtual std::u32string _codegen_name(ir_generation_context &) const = 0;
+        virtual void _codegen_type(ir_generation_context &) const = 0;
 
     protected:
         std::unique_ptr<scope> _member_scope;
@@ -238,44 +147,28 @@ inline namespace _v1
         virtual std::unique_ptr<proto::type> generate_interface() const final;
         virtual std::unique_ptr<proto::type_reference> generate_interface_reference() const final;
 
+        virtual std::u32string codegen_name() const final
+        {
+            assert(_member_scope);
+            return std::u32string{ _member_scope->get_entity_name() };
+        }
+
     private:
         virtual std::unique_ptr<google::protobuf::Message> _user_defined_interface() const = 0;
+        virtual void _codegen_type(ir_generation_context &) const final;
+        virtual void _codegen_user_type(ir_generation_context &,
+            std::shared_ptr<codegen::ir::user_type>) const = 0;
     };
 
-    std::unique_ptr<type> make_type_type();
-    std::unique_ptr<type> make_integer_type();
-    std::unique_ptr<type> make_boolean_type();
-    std::unique_ptr<type> make_unconstrained_type();
-
-    inline const auto & builtin_types()
+    template<typename Pointer>
+    struct builtin_types_t
     {
-        struct builtin_types_t
-        {
-            using member_t = std::unique_ptr<class type>;
+        Pointer type;
+        Pointer integer;
+        Pointer boolean;
+        Pointer unconstrained;
+    };
 
-            member_t type;
-            member_t integer;
-            member_t boolean;
-            member_t unconstrained;
-        };
-
-        static auto builtins = [] {
-            builtin_types_t builtins;
-
-            builtins.type = make_type_type();
-            builtins.integer = make_integer_type();
-            builtins.boolean = make_boolean_type();
-            builtins.unconstrained = make_unconstrained_type();
-
-            return builtins;
-        }();
-
-        builtins.type->init_expr();
-        builtins.integer->init_expr();
-        builtins.boolean->init_expr();
-        builtins.unconstrained->init_expr();
-
-        return builtins;
-    }
+    const builtin_types_t<type *> & builtin_types();
 }
 }

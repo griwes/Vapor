@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2019 Michał "Griwes" Dominiak
+ * Copyright © 2017-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -22,6 +22,7 @@
 
 #include "vapor/analyzer/types/sized_integer.h"
 #include "vapor/analyzer/expressions/boolean.h"
+#include "vapor/analyzer/expressions/call.h"
 #include "vapor/analyzer/expressions/runtime_value.h"
 #include "vapor/analyzer/expressions/sized_integer.h"
 #include "vapor/analyzer/semantic/symbol.h"
@@ -55,7 +56,7 @@ inline namespace _v1
         return type;
     }
 
-    void sized_integer::_codegen_type(ir_generation_context &, std::shared_ptr<codegen::ir::user_type>) const
+    void sized_integer::_codegen_type(ir_generation_context &) const
     {
         _codegen_t = codegen::ir::builtin_types().sized_integer(_size);
     }
@@ -66,29 +67,25 @@ inline namespace _v1
         Eval eval,
         type * return_type)
     {
-        auto lhs = make_runtime_value(this);
-        auto rhs = make_runtime_value(this);
-
-        auto lhs_arg = lhs.get();
-        auto rhs_arg = rhs.get();
+        auto lhs = make_runtime_value(this, nullptr, std::nullopt);
+        auto rhs = make_runtime_value(this, nullptr, std::nullopt);
 
         auto fun = make_function(desc);
         fun->set_name(name);
         fun->set_return_type(return_type->get_expression());
-        fun->set_parameters({ lhs_arg, rhs_arg });
+        fun->set_parameters(unique_expr_list(std::move(lhs), std::move(rhs)));
         fun->set_eval(eval);
-        fun->set_intrinsic_codegen(
-            [name = std::move(name), return_type, lhs = std::move(lhs), rhs = std::move(rhs)](
-                ir_generation_context & ctx, std::vector<codegen::ir::value> arguments) {
-                assert(arguments.size() == 2);
-                auto retval = codegen::ir::make_variable(return_type->codegen_type(ctx));
+        fun->set_intrinsic_codegen([name = std::move(name), return_type](ir_generation_context & ctx,
+                                       std::vector<codegen::ir::value> arguments) {
+            assert(arguments.size() == 2);
+            auto retval = codegen::ir::make_variable(return_type->codegen_type(ctx));
 
-                return statement_ir{ codegen::ir::instruction{ std::nullopt,
-                    std::nullopt,
-                    { boost::typeindex::type_id<Instruction>() },
-                    std::move(arguments),
-                    retval } };
-            });
+            return statement_ir{ codegen::ir::instruction{ std::nullopt,
+                std::nullopt,
+                { boost::typeindex::type_id<Instruction>() },
+                std::move(arguments),
+                retval } };
+        });
         return fun;
     }
 
@@ -96,7 +93,7 @@ inline namespace _v1
 
 #define ADD_OPERATION(NAME, BUILTIN_NAME, OPERATOR, RESULT_TYPE, CONSTANT_TYPE, ADDITIONAL_ARG)              \
     {                                                                                                        \
-        auto eval = [=](auto &&, const std::vector<expression *> & args) {                                   \
+        auto eval = [=](auto &&, call_expression * call, const std::vector<expression *> & args) {           \
             assert(args.size() == 2);                                                                        \
             assert(args[0]->get_type() == this);                                                             \
             assert(args[1]->get_type() == this);                                                             \
@@ -109,7 +106,9 @@ inline namespace _v1
             auto lhs = args[0]->as<sized_integer_constant>();                                                \
             auto rhs = args[1]->as<sized_integer_constant>();                                                \
             return make_ready_future<expression *>(std::make_unique<CONSTANT_TYPE##_constant>(               \
-                EXPAND ADDITIONAL_ARG lhs->get_value() OPERATOR rhs->get_value())                            \
+                EXPAND ADDITIONAL_ARG lhs->get_value() OPERATOR rhs->get_value(),                            \
+                call->get_scope(),                                                                           \
+                call->get_name())                                                                            \
                                                        .release());                                          \
         };                                                                                                   \
         _##NAME = _generate_function<codegen::ir::integer_##NAME##_instruction>(BUILTIN_NAME,                \
@@ -145,19 +144,19 @@ inline namespace _v1
         ADD_OPERATION(equal_comparison,
             U"__builtin_sized_integer_" + u32size + U"_operator_equals",
             ==,
-            builtin_types().boolean.get(),
+            builtin_types().boolean,
             boolean,
             ());
         ADD_OPERATION(less_comparison,
             U"__builtin_sized_integer_" + u32size + U"_operator_less",
             <,
-            builtin_types().boolean.get(),
+            builtin_types().boolean,
             boolean,
             ());
         ADD_OPERATION(less_equal_comparison,
             U"__builtin_sized_" + u32size + U"_integer_operator_less_equal",
             <=,
-            builtin_types().boolean.get(),
+            builtin_types().boolean,
             boolean,
             ());
 

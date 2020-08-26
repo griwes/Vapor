@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2019 Michał "Griwes" Dominiak
+ * Copyright © 2017-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -38,7 +38,9 @@ inline namespace _v1
 {
     std::unique_ptr<typeclass_instance_expression> preanalyze_instance_literal(precontext & ctx,
         const parser::instance_literal & parse,
-        scope * lex_scope)
+        scope * lex_scope,
+        bool is_default,
+        std::optional<std::u32string> canonical_name)
     {
         auto late_preanalysis = [&parse, &ctx](function_definition_handler fn_def) {
             fmap(parse.definitions, [&](auto && definition) {
@@ -50,21 +52,31 @@ inline namespace _v1
             });
         };
 
-        return std::make_unique<typeclass_instance_expression>(
-            make_node(parse), std::move(late_preanalysis), make_typeclass_instance(ctx, parse, lex_scope));
+        return std::make_unique<typeclass_instance_expression>(make_node(parse),
+            std::move(late_preanalysis),
+            make_typeclass_instance(ctx, parse, lex_scope, is_default, std::move(canonical_name)));
     }
 
     typeclass_instance_expression::typeclass_instance_expression(ast_node parse,
         late_preanalysis_type late_pre,
         std::unique_ptr<typeclass_instance> instance)
-        : _late_preanalysis{ std::move(late_pre) }, _instance{ std::move(instance) }
+        : constant{ instance->get_scope()->parent(),
+              instance->is_default()
+                  ? std::nullopt
+                  : std::make_optional(std::u32string{ instance->get_scope()->get_name() }) },
+          _late_preanalysis{ std::move(late_pre) },
+          _instance{ std::move(instance) }
     {
         _set_ast_info(parse);
     }
 
     typeclass_instance_expression::typeclass_instance_expression(ast_node parse,
         std::unique_ptr<typeclass_instance> instance)
-        : _instance{ std::move(instance) }
+        : constant{ instance->get_scope()->parent(),
+              instance->is_default()
+                  ? std::nullopt
+                  : std::make_optional(std::u32string{ instance->get_scope()->get_name() }) },
+          _instance{ std::move(instance) }
     {
         _set_ast_info(parse);
     }
@@ -115,7 +127,18 @@ inline namespace _v1
 
     declaration_ir typeclass_instance_expression::declaration_codegen_ir(ir_generation_context & ctx) const
     {
-        auto ret = codegen::ir::make_variable(get_type()->codegen_type(ctx));
+        if (_instance->is_imported())
+        {
+            // FIXME: this is a hack to get the declarations of all the functions codegenned
+            // to do this properly, I'll need the concept of a variable declaration for the IR
+            // but since the current implementation doesn't _actually_ invoke the global vtables...
+            // ...this is probably fine until the time when I rewrite the virtual call code
+            _constinit_ir(ctx);
+            return {};
+        }
+
+        auto ret = codegen::ir::make_variable(
+            get_type()->codegen_type(ctx), std::u32string{ _instance->get_scope()->get_entity_name() });
         ret->initializer = _constinit_ir(ctx);
         ret->constant = true;
         return { std::move(ret) };
@@ -147,11 +170,6 @@ inline namespace _v1
     typeclass_instance * typeclass_instance_expression::get_instance() const
     {
         return _instance.get();
-    }
-
-    void typeclass_instance_expression::_set_name(std::u32string name)
-    {
-        _instance->set_name(std::move(name));
     }
 
     future<> typeclass_instance_expression::_analyze(analysis_context & ctx)

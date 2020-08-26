@@ -29,7 +29,6 @@
 #include <reaver/variant.h>
 
 #include "../../utf.h"
-#include "scope.h"
 
 namespace reaver::vapor::codegen
 {
@@ -54,7 +53,6 @@ inline namespace _v1
             bool parameter = false;
             bool imported = false;
             bool constant = false;
-            std::vector<scope> scopes = {};
 
             std::optional<recursive_wrapper<value>> initializer;
         };

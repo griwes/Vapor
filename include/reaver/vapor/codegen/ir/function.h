@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -26,7 +26,6 @@
 #include <vector>
 
 #include "instruction.h"
-#include "scope.h"
 #include "variable.h"
 
 namespace reaver::vapor::codegen
@@ -37,12 +36,11 @@ inline namespace _v1
     {
         struct function
         {
-            std::u32string name;
-            std::vector<scope> scopes;
             std::vector<std::shared_ptr<variable>> parameters;
             value return_value;
             std::vector<instruction> instructions;
             std::weak_ptr<type> parent_type = {};
+            std::u32string name = {};
 
             bool is_member = false; // this is a terrible name for this feature, but naming things is hard
             bool is_defined = true;

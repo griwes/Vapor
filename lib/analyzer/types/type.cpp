@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -43,6 +43,45 @@ namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
+    type::type() : _member_scope{ nullptr }
+    {
+        _init_expr();
+        _init_pack_type();
+    }
+
+    type::type(type::dont_init_expr_t) : _member_scope{ nullptr }
+    {
+    }
+
+    type::type(std::unique_ptr<scope> member_scope) : _member_scope{ std::move(member_scope) }
+    {
+        _init_expr();
+        _init_pack_type();
+    }
+
+    type::type(type::dont_init_expr_t, std::unique_ptr<scope> member_scope)
+        : _member_scope{ std::move(member_scope) }
+    {
+    }
+
+    void type::init_expr()
+    {
+        if (!_self_expression)
+        {
+            if (!_expression_initialization)
+            {
+                _expression_initialization = true;
+                _init_expr();
+                _init_pack_type();
+            }
+        }
+    }
+
+    type::type(type::dont_init_pack_t) : _member_scope{ nullptr }
+    {
+        _init_expr();
+    }
+
     type::~type() = default;
 
     void type::_init_expr()
@@ -55,15 +94,56 @@ inline namespace _v1
         _pack_type = make_pack_type(this);
     }
 
+    future<std::vector<function *>> type::get_candidates(lexer::token_type) const
+    {
+        return make_ready_future(std::vector<function *>{});
+    }
+
+    future<function *> type::get_constructor(std::vector<const expression *>) const
+    {
+        return make_ready_future(static_cast<function *>(nullptr));
+    }
+
+    type * type::get_member_type(const std::u32string &) const
+    {
+        return nullptr;
+    }
+
     expression * type::get_expression() const
     {
         return _self_expression->_get_replacement();
     }
 
-    void type::set_name(std::u32string name)
+    type * type::get_pack_type() const
     {
-        get_expression()->set_name(name);
-        _name = std::move(name);
+        assert(_pack_type);
+        return _pack_type.get();
+    }
+
+    bool type::matches(type * other) const
+    {
+        return this == other;
+    }
+
+    bool type::matches(const std::vector<type *> & types) const
+    {
+        return false;
+    }
+
+    bool type::needs_conversion(type * other) const
+    {
+        return false;
+    }
+
+    bool type::is_meta() const
+    {
+        return false;
+    }
+
+    std::unique_ptr<archetype> type::generate_archetype(ast_node node, std::u32string param_name) const
+    {
+        assert(!is_meta() && "default generate_archetype hit, even though is_meta() is true");
+        assert(!"generate_archetype invoked on a non-meta type");
     }
 
     class type_type : public type
@@ -87,15 +167,14 @@ inline namespace _v1
             }
 
             [&] {
-                std::lock_guard<std::mutex> lock{ _generic_ctor_lock };
-
                 if (_generic_ctor)
                 {
                     return;
                 }
 
-                _generic_ctor_first_arg = make_runtime_value(builtin_types().type.get());
-                _generic_ctor_pack_arg = make_runtime_value(builtin_types().unconstrained->get_pack_type());
+                _generic_ctor_first_arg = make_runtime_value(builtin_types().type, nullptr, std::nullopt);
+                _generic_ctor_pack_arg =
+                    make_runtime_value(builtin_types().unconstrained->get_pack_type(), nullptr, std::nullopt);
 
                 _generic_ctor = make_function("generic constructor");
                 _generic_ctor->set_return_type(_generic_ctor_first_arg.get());
@@ -106,7 +185,7 @@ inline namespace _v1
 
                 _generic_ctor->add_analysis_hook([](auto && ctx, auto && call_expr, auto && args) {
                     assert(args.size() != 0);
-                    assert(args.front()->get_type() == builtin_types().type.get());
+                    assert(args.front()->get_type() == builtin_types().type);
                     assert(args.front()->is_constant());
 
                     auto type_expr = args.front()->template as<type_expression>();
@@ -117,12 +196,17 @@ inline namespace _v1
 
                     return actual_ctor
                         .then([&ctx, args, call_expr](auto && ctor) {
-                            return select_overload(ctx, call_expr->get_range(), args, { ctor });
+                            return select_overload(ctx,
+                                call_expr->get_range(),
+                                call_expr->get_scope(),
+                                call_expr->get_name(),
+                                args,
+                                { ctor });
                         })
                         .then([call_expr](auto && expr) { call_expr->replace_with(std::move(expr)); });
                 });
 
-                _generic_ctor->set_eval([](auto &&, auto &&) -> future<expression *> {
+                _generic_ctor->set_eval([](auto &&, call_expression *, auto &&) -> future<expression *> {
                     assert(!"a generic constructor call survived analysis; this is a compiler bug");
                 });
             }();
@@ -162,19 +246,17 @@ inline namespace _v1
             return ret;
         }
 
-    private:
-        virtual void _codegen_type(ir_generation_context &,
-            std::shared_ptr<codegen::ir::user_type>) const override
-        {
-            assert(0);
-        }
-
-        virtual std::u32string _codegen_name(ir_generation_context & ctx) const override
+        virtual std::u32string codegen_name() const override
         {
             return U"type";
         }
 
-        mutable std::mutex _generic_ctor_lock;
+    private:
+        virtual void _codegen_type(ir_generation_context &) const override
+        {
+            assert(0);
+        }
+
         mutable std::shared_ptr<function> _generic_ctor;
         mutable std::unique_ptr<expression> _generic_ctor_first_arg;
         mutable std::unique_ptr<expression> _generic_ctor_pack_arg;
@@ -218,28 +300,86 @@ inline namespace _v1
     {
         auto user_defined = std::make_unique<proto::user_defined_reference>();
 
-        for (auto scope : get_scope()->codegen_ir())
+        std::vector<scope *> scope_stack;
+        auto current = get_scope()->parent();
+        while (current)
         {
-            switch (scope.type)
+            scope_stack.push_back(current);
+            current = current->parent();
+        }
+
+        for (auto it = scope_stack.rbegin(); it != scope_stack.rend(); ++it)
+        {
+            auto scope = *it;
+            switch (scope->get_kind())
             {
-                case codegen::ir::scope_type::module:
-                    *user_defined->add_module() = utf8(scope.name);
+                case scope_kind::module:
                     break;
 
-                case codegen::ir::scope_type::type:
+                case scope_kind::type:
                     assert(!"should probably implemented nested UDT references now... ;)");
+
+                case scope_kind::global:
+                    break;
 
                 default:
                     assert(0);
             }
         }
 
-        user_defined->set_name(utf8(get_name()));
+        user_defined->set_name(utf8(get_scope()->get_entity_name()));
 
         auto ret = std::make_unique<proto::type_reference>();
         ret->set_allocated_user_defined(user_defined.release());
 
         return ret;
+    }
+
+    void user_defined_type::_codegen_type(ir_generation_context & ctx) const
+    {
+        if (!_codegen_t)
+        {
+            auto user_type = std::make_shared<codegen::ir::user_type>();
+            _codegen_t = user_type;
+            _codegen_user_type(ctx, std::move(user_type));
+        }
+    }
+
+    std::unique_ptr<type> make_type_type();
+    std::unique_ptr<type> make_integer_type();
+    std::unique_ptr<type> make_boolean_type();
+    std::unique_ptr<type> make_unconstrained_type();
+
+    const builtin_types_t<type *> & builtin_types()
+    {
+        static auto builtins = [] {
+            builtin_types_t<std::unique_ptr<type>> ret;
+
+            ret.type = make_type_type();
+            ret.integer = make_integer_type();
+            ret.boolean = make_boolean_type();
+            ret.unconstrained = make_unconstrained_type();
+
+            return ret;
+        }();
+
+        static auto builtins_raw = [&] {
+            builtin_types_t<type *> ret;
+
+            ret.type = builtins.type.get();
+            ret.integer = builtins.integer.get();
+            ret.boolean = builtins.boolean.get();
+            ret.unconstrained = builtins.unconstrained.get();
+
+            return ret;
+        }();
+
+        builtins.type->init_expr();
+        builtins.integer->init_expr();
+        builtins.boolean->init_expr();
+        builtins.unconstrained->init_expr();
+
+        return builtins_raw;
     }
 }
 }

@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2019 Michał "Griwes" Dominiak
+ * Copyright © 2017-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -77,18 +77,13 @@ inline namespace _v1
         return _function->run_analysis_hooks(ctx, this, _args).then([&]() {
             if (_replacement_expr)
             {
-                if (has_entity_name())
-                {
-                    _replacement_expr->set_name(get_entity_name());
-                }
-
                 return _replacement_expr->analyze(ctx).then(
                     [&] { this->_set_type(_replacement_expr->get_type()); });
             }
 
             return _function->get_return_type().then([&](expression * type_expr) {
                 assert(type_expr);
-                assert(type_expr->get_type() == builtin_types().type.get());
+                assert(type_expr->get_type() == builtin_types().type);
 
                 if (!type_expr->is_constant())
                 {
@@ -150,11 +145,11 @@ inline namespace _v1
                                 //
                                 // the other way does work for it too, but... it's not pretty resource-wise
                                 auto expr = matching_expressions.front();
-                                assert(expr->get_type() == builtin_types().type.get());
+                                assert(expr->get_type() == builtin_types().type);
 
                                 auto type_expr = expr->as<type_expression>();
                                 assert(type_expr);
-                                assert(type_expr->get_value() != builtin_types().type.get());
+                                assert(type_expr->get_value() != builtin_types().type);
 
                                 this->_set_type(type_expr->get_value());
 
@@ -185,18 +180,18 @@ inline namespace _v1
                     return simplification_loop(ctx, _cloned_type_expr)
                         .then([this, var_space, expr_space](expression * type_expr) {
                             assert(type_expr);
-                            assert(type_expr->get_type() == builtin_types().type.get());
+                            assert(type_expr->get_type() == builtin_types().type);
 
                             auto expr = type_expr->as<type_expression>();
                             assert(expr);
-                            assert(expr->get_value() != builtin_types().type.get());
+                            assert(expr->get_value() != builtin_types().type);
 
                             this->_set_type(expr->get_value());
                         });
                 }
 
                 auto expr = type_expr->as<type_expression>();
-                assert(expr->get_value() != builtin_types().type.get());
+                assert(expr->get_value() != builtin_types().type);
 
                 this->_set_type(expr->get_value());
 
@@ -209,12 +204,7 @@ inline namespace _v1
     {
         if (_replacement_expr)
         {
-            auto ret = repl.claim(_replacement_expr.get());
-            if (has_entity_name())
-            {
-                ret->set_name(get_entity_name());
-            }
-            return ret;
+            return repl.claim(_replacement_expr.get());
         }
 
         auto fn = repl.try_get_replacement(_function);
@@ -229,14 +219,13 @@ inline namespace _v1
             vtable_arg = repl.claim(_vtable_arg.get());
         }
 
-        auto ret = std::make_unique<owning_call_expression>(
-            fn, std::move(vtable_arg), fmap(_args, [&](auto arg) { return repl.copy_claim(arg); }));
+        auto ret = std::make_unique<owning_call_expression>(fn,
+            std::move(vtable_arg),
+            fmap(_args, [&](auto arg) { return repl.copy_claim(arg); }),
+            get_scope(),
+            get_name());
 
         ret->set_ast_info(get_ast_info().value());
-        if (has_entity_name())
-        {
-            ret->set_name(get_entity_name());
-        }
 
         if (_cloned_type_expr)
         {
@@ -307,14 +296,7 @@ inline namespace _v1
                 }
 
                 logger::dlog(logger::trace) << "Simplifying call_expr " << this;
-                return _function->simplify(ctx, _args);
-            })
-            .then([this](auto ret) {
-                if (ret && has_entity_name())
-                {
-                    ret->set_name(get_entity_name());
-                }
-                return ret;
+                return _function->simplify(ctx, this, _args);
             });
     }
 

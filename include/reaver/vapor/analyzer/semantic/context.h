@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2016-2019 Michał "Griwes" Dominiak
+ * Copyright © 2016-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../../range.h"
 #include "../simplification/context.h"
 #include "signature.h"
 
@@ -29,10 +30,13 @@ namespace reaver::vapor::analyzer
 {
 inline namespace _v1
 {
+    class scope;
     class sized_integer;
     class function_type;
     class typeclass;
     class typeclass_type;
+    class typeclass_instance_expression;
+    class typeclass_instance_type;
     class default_instance;
 
     struct expression_list_hash
@@ -69,12 +73,18 @@ inline namespace _v1
         future<> default_instances_future() const;
         void set_default_instance_definition_count(std::size_t count);
         void add_default_instance_definition(default_instance * inst);
+        future<std::unique_ptr<expression>> resolve_default_instance(const range_type & range,
+            scope * lex_scope,
+            std::optional<std::u32string> name,
+            typeclass_instance_type * inst);
 
         std::shared_ptr<cached_results> results;
         std::shared_ptr<simplification_context> simplification_ctx;
 
         bool entry_point_marked = false;
         bool entry_variable_marked = false;
+
+        std::size_t closure_index = 0;
 
     private:
         std::size_t _unprocessed_default_instance_definitions = 0;

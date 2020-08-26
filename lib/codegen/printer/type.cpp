@@ -67,8 +67,8 @@ inline namespace _v1
                 return unit{};
             });
 
-            return U"define user @ " + _pointer_to_string(type.get()) + U" `" + _scope_string(user->scopes)
-                + U"." + user->name + U"`:\n{\n" + members + U"}\n";
+            return U"define user @ " + _pointer_to_string(type.get()) + U" `" + U"." + user->name + U"`:\n{\n"
+                + members + U"}\n";
         }
 
         assert(!"unsupported type in codegen ir!");

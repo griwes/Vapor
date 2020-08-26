@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2018-2019 Michał "Griwes" Dominiak
+ * Copyright © 2018-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -30,12 +30,18 @@ inline namespace _v1
 {
     void module_type::add_symbol(std::string name, expression * entity, bool is_visible)
     {
-        auto symbol = make_symbol(utf32(name), entity);
+        auto u32name = utf32(name);
+        if (u32name.substr(0, _member_scope->get_scoped_name().size()) == _member_scope->get_scoped_name())
+        {
+            u32name = u32name.substr(_member_scope->get_scoped_name().size());
+        }
+
+        auto symbol = make_symbol(u32name, entity);
         if (!is_visible)
         {
             symbol->hide();
         }
-        _member_scope->init(utf32(name), std::move(symbol));
+        _member_scope->init(u32name, std::move(symbol));
     }
 
     void module_type::close_scope()

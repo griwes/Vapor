@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2017-2019 Michał "Griwes" Dominiak
+ * Copyright © 2017-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -36,14 +36,16 @@ inline namespace _v1
 {
     std::unique_ptr<typeclass_expression> preanalyze_typeclass_literal(precontext & ctx,
         const parser::typeclass_literal & parse,
-        scope * lex_scope)
+        scope * lex_scope,
+        std::optional<std::u32string> canonical_name)
     {
         return std::make_unique<typeclass_expression>(
-            make_node(parse), make_typeclass(ctx, parse, lex_scope));
+            make_node(parse), make_typeclass(ctx, parse, lex_scope, std::move(canonical_name)));
     }
 
     typeclass_expression::typeclass_expression(ast_node parse, std::unique_ptr<typeclass> tc)
-        : _typeclass{ std::move(tc) }
+        : expression{ tc->get_scope()->parent(), std::u32string{ tc->get_scope()->get_name() } },
+          _typeclass{ std::move(tc) }
     {
         _set_ast_info(parse);
     }
@@ -81,11 +83,6 @@ inline namespace _v1
                     os, decl_ctx.make_branch(++idx == _typeclass->get_member_function_decls().size()));
             }
         }
-    }
-
-    void typeclass_expression::_set_name(std::u32string name)
-    {
-        _typeclass->set_name(std::move(name));
     }
 
     future<> typeclass_expression::_analyze(analysis_context & ctx)

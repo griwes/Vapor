@@ -34,8 +34,11 @@ inline namespace _v1
     class boolean_constant : public constant
     {
     public:
-        boolean_constant(bool value, ast_node parse = {})
-            : constant{ builtin_types().boolean.get() }, _value{ std::move(value) }
+        boolean_constant(bool value,
+            scope * lex_scope,
+            std::optional<std::u32string> name,
+            ast_node parse = {})
+            : constant{ builtin_types().boolean, lex_scope, std::move(name) }, _value{ std::move(value) }
         {
             _set_ast_info(parse);
         }
@@ -60,7 +63,8 @@ inline namespace _v1
 
         virtual std::unique_ptr<expression> _clone_expr(replacements & repl) const override
         {
-            return std::make_unique<boolean_constant>(_value, get_ast_info().value());
+            return std::make_unique<boolean_constant>(
+                _value, get_scope(), get_name(), get_ast_info().value());
         }
 
         virtual future<expression *> _simplify_expr(recursive_context) override
@@ -84,9 +88,12 @@ inline namespace _v1
         bool _value;
     };
 
-    inline std::unique_ptr<boolean_constant> make_boolean_constant(const parser::boolean_literal & parse)
+    inline std::unique_ptr<boolean_constant> make_boolean_constant(const parser::boolean_literal & parse,
+        scope * lex_scope,
+        std::optional<std::u32string> name)
     {
-        return std::make_unique<boolean_constant>(parse.value.string == U"true", make_node(parse));
+        return std::make_unique<boolean_constant>(
+            parse.value.string == U"true", lex_scope, std::move(name), make_node(parse));
     }
 }
 }

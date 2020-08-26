@@ -1,7 +1,7 @@
 /**
  * Vapor Compiler Licence
  *
- * Copyright © 2018-2019 Michał "Griwes" Dominiak
+ * Copyright © 2018-2020 Michał "Griwes" Dominiak
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -45,7 +45,6 @@ inline namespace _v1
 
     struct synthesized_udr
     {
-        std::string module;
         std::string name;
     };
 
@@ -73,6 +72,9 @@ inline namespace _v1
 
         std::unordered_map<synthesized_udr, std::shared_ptr<overload_set>, udr_hash, udr_compare>
             imported_overload_sets = {};
+
+        // shared to avoid needing a definition
+        std::vector<std::unique_ptr<statement>> imported_default_instances = {};
 
         std::unordered_map<const proto::user_defined_reference *,
             std::shared_ptr<unresolved_type>,
